@@ -1,0 +1,34 @@
+Package: inferencer
+Type: Package
+Title: Simple Unified Wrappers for Hosted Foundation Model Inference APIs
+Version: 0.1.0
+Authors@R: 
+    person(
+      given = "Oliver",
+      family = "Zhou",
+      role = c("aut", "cre"),
+      email = "olee7149@gmail.com"
+    )
+Description: Provides lightweight R wrappers for querying and listing models
+    from several hosted foundation model inference platforms, currently
+    including Google Gemini, Groq, OpenRouter, and Cerebras. The package is
+    designed for simple prompt-based workflows and quick experimentation,
+    with minimal abstraction and a consistent interface across providers.
+    It includes helper functions for model discovery and text generation,
+    while leaving room for future support of provider-specific parameters
+    and advanced options.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Imports:
+    curl,
+    data.table,
+    httr,
+    httr2,
+    jsonlite
+Suggests:
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
