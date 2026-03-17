@@ -1,24 +1,78 @@
+#' List Groq Models
+#'
+#' Retrieves available models from the Groq models endpoint.
+#'
+#' @param api_key Groq API key. Defaults to `Sys.getenv("GROQ_API_KEY")`.
+#' @param url Groq models endpoint.
+#' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#'
+#' @return A `data.table` by default, or a parsed JSON list when
+#'   `json_list = TRUE`.
 #' @export
-list_groq_models <- function(api_key = Sys.getenv("GROQ_API_KEY"), url = "https://api.groq.com/openai/v1/models", raw_json = FALSE) {
+list_groq_models <- function(api_key = Sys.getenv("GROQ_API_KEY"), url = "https://api.groq.com/openai/v1/models", json_list = FALSE) {
+
+  if (!nzchar(api_key)) {
+    stop("GROQ_API_KEY is not set.", call. = FALSE)
+  }
   
   response <- httr2::request(url) |>
     httr2::req_headers(
       Authorization = paste("Bearer", api_key),
       `Content-Type` = "application/json"
     ) |>
+    httr2::req_error(is_error = function(resp) FALSE) |>
     httr2::req_perform()
-  if (raw_json) return(response)
-  
-  response_dt <- lapply(httr2::resp_body_json(response)$data, function(x) {x$public_apps <- NULL; x}) # public_apps field has problem
+
+  txt <- httr2::resp_body_string(response)
+  parsed <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
+
+  if (httr2::resp_status(response) >= 300) {
+    if (!is.null(parsed$error) && !is.null(parsed$error$message) && nzchar(parsed$error$message)) {
+      stop(sprintf("Groq API error: %s", parsed$error$message), call. = FALSE)
+    }
+    stop("Groq API request failed: ", txt, call. = FALSE)
+  }
+
+  if (json_list) return(parsed)
+
+  if (is.null(parsed$data)) {
+    stop("Groq API response does not contain a `data` field.", call. = FALSE)
+  }
+
+  response_dt <- lapply(parsed$data, function(x) {x$public_apps <- NULL; x}) # public_apps field has problem
   data.table::rbindlist(response_dt, fill = TRUE)
 }
 
+#' Query a Groq Chat Model
+#'
+#' Sends a single user prompt to the Groq chat completions API.
+#'
+#' @param prompt A non-empty character string.
+#' @param api_key Groq API key. Defaults to `Sys.getenv("GROQ_API_KEY")`.
+#' @param url Groq chat completions endpoint.
+#' @param model Model identifier.
+#' @param temperature Sampling temperature.
+#' @param top_p Nucleus sampling parameter.
+#' @param max_tokens Maximum number of output tokens.
+#' @param stream Whether to request streaming output.
+#' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#'
+#' @return A character string by default, or a parsed JSON list when
+#'   `json_list = TRUE`.
 #' @export
 query_groq <- function(prompt, api_key = Sys.getenv("GROQ_API_KEY"),
   url = Sys.getenv("GROQ_API_URL", unset = "https://api.groq.com/openai/v1/chat/completions"),
   model = c("groq/compound", "allam-2-7b", "groq/compound-mini", "qwen/qwen3-32b", "openai/gpt-oss-20b", "canopylabs/orpheus-v1-english", "openai/gpt-oss-120b", "whisper-large-v3", "llama-3.3-70b-versatile", "moonshotai/kimi-k2-instruct-0905", "whisper-large-v3-turbo", "meta-llama/llama-prompt-guard-2-86m", "moonshotai/kimi-k2-instruct", "meta-llama/llama-prompt-guard-2-22m", "meta-llama/llama-4-scout-17b-16e-instruct", "openai/gpt-oss-safeguard-20b", "llama-3.1-8b-instant", "canopylabs/orpheus-arabic-saudi"),
   temperature = 1.0, top_p = 1.0, max_tokens = 1024, 
-  stream = FALSE, raw_json = FALSE) {
+  stream = FALSE, json_list = FALSE) {
+
+  if (!is.character(prompt) || length(prompt) != 1 || !nzchar(prompt)) {
+    stop("`prompt` must be a non-empty character string.", call. = FALSE)
+  }
+
+  if (!nzchar(api_key)) {
+    stop("GROQ_API_KEY is not set.", call. = FALSE)
+  }
 
   model <- match.arg(model)
 
@@ -37,14 +91,33 @@ query_groq <- function(prompt, api_key = Sys.getenv("GROQ_API_KEY"),
       "Content-Type" = "application/json",
       Authorization = paste("Bearer", api_key)
     ),
-    body = jsonlite::toJSON(body, auto_unbox = TRUE),
+    body = body,
     encode = "json"
   )
 
-  if (raw_json) return(response)
-  parsed <- httr::content(response, as = "parsed", encoding = "UTF-8")
+  txt <- httr::content(response, as = "text", encoding = "UTF-8")
+
+  if (httr::status_code(response) >= 300) {
+    stop("Groq API request failed: ", txt, call. = FALSE)
+  }
+
+  parsed <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
+
+  if (json_list) return(parsed)
+
+  if (is.null(parsed$choices) || length(parsed$choices) < 1) {
+    stop("Groq API returned no choices.", call. = FALSE)
+  }
+
+  if (is.null(parsed$choices[[1]]$message)) {
+    stop("Groq API returned no message object.", call. = FALSE)
+  }
+
   text <- parsed$choices[[1]]$message$content
+
+  if (!is.character(text) || length(text) != 1 || !nzchar(text)) {
+    stop("Groq API returned no message content.", call. = FALSE)
+  }
+
   return(text)
 }
-
-

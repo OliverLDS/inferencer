@@ -1,32 +1,76 @@
+#' List OpenRouter Models
+#'
+#' Retrieves available models from the OpenRouter models endpoint.
+#'
+#' @param api_key OpenRouter API key. Defaults to
+#'   `Sys.getenv("OPENROUTER_API_KEY")`.
+#' @param url OpenRouter models endpoint.
+#' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#'
+#' @return A `data.table` by default, or a parsed JSON list when
+#'   `json_list = TRUE`.
 #' @export
 list_openrouter_models <- function(
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = "https://openrouter.ai/api/v1/models",
-  raw_json = FALSE
+  json_list = FALSE
 ) {
-  
-  txt <- rawToChar(
-    curl::curl_fetch_memory(
-      url,
-      handle = curl::new_handle(
-        httpheader = c(
-          "Authorization" = paste("Bearer", api_key)
-        )
-      )
-    )$content
-  )
-  
-  if (raw_json) return(txt)
-  
-  res <- jsonlite::fromJSON(txt, simplifyDataFrame = TRUE)
-  
-  if (!"data" %in% names(res)) {
-    stop("Response does not contain a 'data' field.")
+  if (!nzchar(api_key)) {
+    stop("OPENROUTER_API_KEY is not set.", call. = FALSE)
   }
   
-  data.table::as.data.table(res$data)
+  response <- curl::curl_fetch_memory(
+    url,
+    handle = curl::new_handle(
+      httpheader = c(
+        "Authorization" = paste("Bearer", api_key)
+      )
+    )
+  )
+
+  txt <- rawToChar(response$content)
+
+  if (response$status_code >= 300) {
+    stop("OpenRouter API request failed: ", txt, call. = FALSE)
+  }
+  
+  res <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
+
+  if (!is.null(res$error)) {
+    if (!is.null(res$error$message) && nzchar(res$error$message)) {
+      msg <- res$error$message
+    } else {
+      msg <- "Unknown API error."
+    }
+    stop(sprintf("OpenRouter API error: %s", msg), call. = FALSE)
+  }
+
+  if (json_list) return(res)
+  
+  if (!"data" %in% names(res)) {
+    stop("Response does not contain a 'data' field.", call. = FALSE)
+  }
+  
+  data.table::rbindlist(res$data, fill = TRUE)
 }
 
+#' Query an OpenRouter Chat Model
+#'
+#' Sends a single user prompt to the OpenRouter chat completions API.
+#'
+#' @param prompt A non-empty character string.
+#' @param model Model identifier.
+#' @param temperature Sampling temperature.
+#' @param top_p Nucleus sampling parameter.
+#' @param max_tokens Maximum number of output tokens.
+#' @param reasoning Whether to enable reasoning mode.
+#' @param api_key OpenRouter API key. Defaults to
+#'   `Sys.getenv("OPENROUTER_API_KEY")`.
+#' @param url OpenRouter chat completions endpoint.
+#' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#'
+#' @return A character string by default, or a parsed JSON list when
+#'   `json_list = TRUE`.
 #' @export
 query_openrouter <- function(
   prompt,
@@ -34,13 +78,31 @@ query_openrouter <- function(
   temperature = 0,
   top_p = 1,
   max_tokens = 512L,
-  reasoning = "true",
+  reasoning = TRUE,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset = "https://openrouter.ai/api/v1/chat/completions"),
-  raw_json = FALSE
+  json_list = FALSE
 ) {
-  if (!nzchar(prompt)) stop('Usage: query_openrouter("your prompt")', call. = FALSE)
+  if (!is.character(prompt) || length(prompt) != 1 || !nzchar(prompt)) {
+    stop("`prompt` must be a non-empty character string.", call. = FALSE)
+  }
   if (!nzchar(api_key)) stop("OPENROUTER_API_KEY is not set.", call. = FALSE)
+
+  if (!is.numeric(temperature) || length(temperature) != 1 || is.na(temperature)) {
+    stop("`temperature` must be a single numeric value.", call. = FALSE)
+  }
+
+  if (!is.numeric(top_p) || length(top_p) != 1 || is.na(top_p)) {
+    stop("`top_p` must be a single numeric value.", call. = FALSE)
+  }
+
+  if (!is.numeric(max_tokens) || length(max_tokens) != 1 || is.na(max_tokens) || max_tokens < 1) {
+    stop("`max_tokens` must be a single positive number.", call. = FALSE)
+  }
+
+  if (!is.logical(reasoning) || length(reasoning) != 1 || is.na(reasoning)) {
+    stop("`reasoning` must be TRUE or FALSE.", call. = FALSE)
+  }
     
   model <- match.arg(model)
 
@@ -66,12 +128,18 @@ query_openrouter <- function(
       "Authorization" = paste("Bearer", api_key)
     ) |>
     httr2::req_body_json(body, auto_unbox = TRUE) |>
+    httr2::req_error(is_error = function(resp) FALSE) |>
     httr2::req_perform()
 
   txt <- httr2::resp_body_string(resp)
   json <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
   
-  if (raw_json) return(json)
+  if (httr2::resp_status(resp) >= 300) {
+    if (!is.null(json$error) && !is.null(json$error$message) && nzchar(json$error$message)) {
+      stop(sprintf("OpenRouter API error: %s", json$error$message), call. = FALSE)
+    }
+    stop("OpenRouter API request failed: ", txt, call. = FALSE)
+  }
 
   if (!is.null(json$error)) {
     if (!is.null(json$error$message) && nzchar(json$error$message)) {
@@ -81,6 +149,8 @@ query_openrouter <- function(
     }
     stop(sprintf("OpenRouter API error: %s", msg), call. = FALSE)
   }
+
+  if (json_list) return(json)
 
   if (is.null(json$choices) || length(json$choices) < 1) {
     stop("API returned no choices.", call. = FALSE)
@@ -92,7 +162,7 @@ query_openrouter <- function(
 
   content <- json$choices[[1]]$message$content
 
-  if (is.null(content) || !nzchar(content)) {
+  if (!is.character(content) || length(content) != 1 || !nzchar(content)) {
     stop("API returned no message content.", call. = FALSE)
   }
 

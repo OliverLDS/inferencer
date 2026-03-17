@@ -32,25 +32,91 @@
   FALSE
 }
 
+#' List Gemini Models
+#'
+#' Retrieves available models from the Gemini models endpoint.
+#'
+#' @param api_key Gemini API key. Defaults to `Sys.getenv("GEMINI_API_KEY")`.
+#' @param url Gemini models endpoint.
+#' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#'
+#' @return A `data.table` by default, or a parsed JSON list when
+#'   `json_list = TRUE`.
 #' @export
-list_gemini_models <- function(api_key = Sys.getenv("GEMINI_API_KEY"), url = "https://generativelanguage.googleapis.com/v1beta/models", raw_json = FALSE) {
+list_gemini_models <- function(api_key = Sys.getenv("GEMINI_API_KEY"), url = "https://generativelanguage.googleapis.com/v1beta/models", json_list = FALSE) {
 
-  res <- jsonlite::fromJSON(
-    paste0(url, "?key=", api_key),
-    simplifyVector = TRUE
-  )
-  if (raw_json) return(res)
-  data.table::rbindlist(res, fill = TRUE)
+  if (!nzchar(api_key)) {
+    stop("GEMINI_API_KEY is not set.", call. = FALSE)
+  }
+
+  response <- httr::GET(paste0(url, "?key=", api_key))
+  txt <- httr::content(response, as = "text", encoding = "UTF-8")
+
+  if (httr::status_code(response) >= 300) {
+    stop("Gemini API request failed: ", txt, call. = FALSE)
+  }
+
+  res <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
+
+  if (json_list) return(res)
+
+  if (is.null(res$models)) {
+    stop("Gemini API response does not contain a `models` field.", call. = FALSE)
+  }
+
+  data.table::rbindlist(res$models, fill = TRUE)
 }
 
+#' Query a Gemini Model
+#'
+#' Sends a single user prompt to the Gemini `generateContent` API.
+#'
+#' @param prompt A non-empty character string.
+#' @param api_key Gemini API key. Defaults to `Sys.getenv("GEMINI_API_KEY")`.
+#' @param model Model identifier.
+#' @param url0 Base Gemini models URL.
+#' @param temperature Sampling temperature.
+#' @param top_p Nucleus sampling parameter.
+#' @param top_k Top-k sampling parameter.
+#' @param max_tokens Optional maximum number of output tokens.
+#' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#'
+#' @return A character string by default, or a parsed JSON list when
+#'   `json_list = TRUE`.
 #' @export
 query_gemini <- function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"),
   model = c("gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemini-2.5-flash-preview-tts", "gemini-embedding-001", "gemma-3-27b-it", "gemma-3n-e2b-it"), # just list some common models here; if you want the complete list of free models, you can rs <- list_gemini_models(); rs[sapply(rs$name, .has_free_tier), name]
   url0 = Sys.getenv("GEMINI_API_URL", unset = "https://generativelanguage.googleapis.com/v1beta/models"),
   temperature = 0.7, top_p = 1, top_k = 40, max_tokens = NULL, 
-  raw_json = FALSE) {
+  json_list = FALSE) {
+
+  if (!is.character(prompt) || length(prompt) != 1 || !nzchar(prompt)) {
+    stop("`prompt` must be a non-empty character string.", call. = FALSE)
+  }
+
+  if (!nzchar(api_key)) {
+    stop("GEMINI_API_KEY is not set.", call. = FALSE)
+  }
+
+  if (!is.numeric(temperature) || length(temperature) != 1 || is.na(temperature)) {
+    stop("`temperature` must be a single numeric value.", call. = FALSE)
+  }
+
+  if (!is.numeric(top_p) || length(top_p) != 1 || is.na(top_p)) {
+    stop("`top_p` must be a single numeric value.", call. = FALSE)
+  }
+
+  if (!is.numeric(top_k) || length(top_k) != 1 || is.na(top_k)) {
+    stop("`top_k` must be a single numeric value.", call. = FALSE)
+  }
 
   model <- match.arg(model)
+
+  if (!is.null(max_tokens)) {
+    if (!is.numeric(max_tokens) || length(max_tokens) != 1 || is.na(max_tokens) || max_tokens < 1) {
+      stop("`max_tokens` must be a single positive number or NULL.", call. = FALSE)
+    }
+  }
   
   url <- sprintf("%s/%s:generateContent?key=%s", url0, model, api_key)
   
@@ -76,13 +142,30 @@ query_gemini <- function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"),
     body = jsonlite::toJSON(body, auto_unbox = TRUE),
     encode = "raw"
   )
-  
-  if (raw_json) return(response)
 
-  if (httr::status_code(response) != 200) {
-    stop("Gemini API request failed: ", httr::content(response, as = "text"))
+  txt <- httr::content(response, as = "text", encoding = "UTF-8")
+
+  if (httr::status_code(response) >= 300) {
+    stop("Gemini API request failed: ", txt, call. = FALSE)
   }
 
-  parsed <- httr::content(response, as = "parsed", type = "application/json")
-  return(parsed$candidates[[1]]$content$parts[[1]]$text)
+  parsed <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
+
+  if (json_list) return(parsed)
+
+  if (is.null(parsed$candidates) || length(parsed$candidates) < 1) {
+    stop("Gemini API returned no candidates.", call. = FALSE)
+  }
+
+  if (is.null(parsed$candidates[[1]]$content$parts) || length(parsed$candidates[[1]]$content$parts) < 1) {
+    stop("Gemini API returned no content parts.", call. = FALSE)
+  }
+
+  text <- parsed$candidates[[1]]$content$parts[[1]]$text
+
+  if (!is.character(text) || length(text) != 1 || !nzchar(text)) {
+    stop("Gemini API returned no text content.", call. = FALSE)
+  }
+
+  return(text)
 }

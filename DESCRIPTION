@@ -18,8 +18,11 @@ Description: Provides lightweight R wrappers for querying and listing models
     while leaving room for future support of provider-specific parameters
     and advanced options.
 License: MIT + file LICENSE
+URL: https://github.com/OliverLDS/inferencer
+BugReports: https://github.com/OliverLDS/inferencer/issues
+Depends:
+    R (>= 4.1.0)
 Encoding: UTF-8
-LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
 Imports:
@@ -30,5 +33,6 @@ Imports:
     jsonlite
 Suggests:
     knitr,
-    rmarkdown
-VignetteBuilder: knitr
+    rmarkdown,
+    testthat
+Config/testthat/edition: 3

@@ -43,10 +43,10 @@ gemini_models <- list_gemini_models()
 head(gemini_models)
 ```
 
-Raw JSON:
+Parsed JSON list:
 
 ```r
-gemini_raw <- list_gemini_models(raw_json = TRUE)
+gemini_json <- list_gemini_models(json_list = TRUE)
 ```
 
 ### Groq
@@ -63,10 +63,10 @@ openrouter_models <- list_openrouter_models()
 head(openrouter_models)
 ```
 
-Raw response text:
+Parsed JSON list:
 
 ```r
-openrouter_raw <- list_openrouter_models(raw_json = TRUE)
+openrouter_json <- list_openrouter_models(json_list = TRUE)
 ```
 
 ## Query models
@@ -151,11 +151,11 @@ list(
 
 ## Example workflow: inspect free or low-cost model candidates
 
-### Gemini free-tier models
+### Gemini models as parsed JSON
 
 ```r
-gm <- list_gemini_models()
-gm[sapply(gm$name, .has_free_tier), .(name, displayName)]
+gm_json <- list_gemini_models(json_list = TRUE)
+names(gm_json)
 ```
 
 ### OpenRouter free models
