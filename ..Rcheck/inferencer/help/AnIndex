@@ -1,0 +1,9 @@
+inferencer-package	inferencer-package
+inferencer	inferencer-package
+list_gemini_models	list_gemini_models
+list_groq_models	list_groq_models
+list_openrouter_models	list_openrouter_models
+query_cerebras	query_cerebras
+query_gemini	query_gemini
+query_groq	query_groq
+query_openrouter	query_openrouter

@@ -51,7 +51,25 @@ list_openrouter_models <- function(
     stop("Response does not contain a 'data' field.", call. = FALSE)
   }
   
-  data.table::rbindlist(res$data, fill = TRUE)
+  # need to handle nested list strucutre which may contain different number of items across models
+  rows <- lapply(res$data, function(x) {
+    x$architecture <- list(x$architecture)
+    x$pricing <- list(x$pricing)
+    x$top_provider <- list(x$top_provider)
+    x$per_request_limits <- list(x$per_request_limits)
+    x$supported_parameters <- list(x$supported_parameters)
+    x$default_parameters <- list(x$default_parameters)
+  
+    for (nm in names(x)) {
+      if (length(x[[nm]]) == 0) {
+        x[[nm]] <- NA
+      }
+    }
+  
+    x
+  })
+  
+  data.table::rbindlist(rows, fill = TRUE)
 }
 
 #' Query an OpenRouter Chat Model
@@ -92,8 +110,16 @@ query_openrouter <- function(
     stop("`temperature` must be a single numeric value.", call. = FALSE)
   }
 
+  if (temperature < 0) {
+    stop("`temperature` must be greater than or equal to 0.", call. = FALSE)
+  }
+
   if (!is.numeric(top_p) || length(top_p) != 1 || is.na(top_p)) {
     stop("`top_p` must be a single numeric value.", call. = FALSE)
+  }
+
+  if (top_p < 0 || top_p > 1) {
+    stop("`top_p` must be between 0 and 1.", call. = FALSE)
   }
 
   if (!is.numeric(max_tokens) || length(max_tokens) != 1 || is.na(max_tokens) || max_tokens < 1) {

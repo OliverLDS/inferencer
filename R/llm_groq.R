@@ -74,6 +74,30 @@ query_groq <- function(prompt, api_key = Sys.getenv("GROQ_API_KEY"),
     stop("GROQ_API_KEY is not set.", call. = FALSE)
   }
 
+  if (!is.numeric(temperature) || length(temperature) != 1 || is.na(temperature)) {
+    stop("`temperature` must be a single numeric value.", call. = FALSE)
+  }
+
+  if (temperature < 0) {
+    stop("`temperature` must be greater than or equal to 0.", call. = FALSE)
+  }
+
+  if (!is.numeric(top_p) || length(top_p) != 1 || is.na(top_p)) {
+    stop("`top_p` must be a single numeric value.", call. = FALSE)
+  }
+
+  if (top_p < 0 || top_p > 1) {
+    stop("`top_p` must be between 0 and 1.", call. = FALSE)
+  }
+
+  if (!is.numeric(max_tokens) || length(max_tokens) != 1 || is.na(max_tokens) || max_tokens < 1) {
+    stop("`max_tokens` must be a single positive number.", call. = FALSE)
+  }
+
+  if (!is.logical(stream) || length(stream) != 1 || is.na(stream)) {
+    stop("`stream` must be TRUE or FALSE.", call. = FALSE)
+  }
+
   model <- match.arg(model)
 
   body <- list(

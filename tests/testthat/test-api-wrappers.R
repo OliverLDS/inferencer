@@ -48,6 +48,8 @@ test_that("query_gemini returns text and validates prompt", {
   expect_equal(json$candidates[[1]]$content$parts[[1]]$text, "Gemini reply")
 
   expect_error(query_gemini("", api_key = "key"), "`prompt` must be a non-empty character string.")
+  expect_error(query_gemini("hello", api_key = "key", top_p = 2), "`top_p` must be between 0 and 1.")
+  expect_error(query_gemini("hello", api_key = "key", top_k = 0), "`top_k` must be a single positive integer.")
 })
 
 test_that("list_groq_models returns a data table or json list", {
@@ -110,6 +112,11 @@ test_that("query_groq returns text and surfaces API errors", {
   )
 
   expect_error(query_groq("hello", api_key = "key"), "Groq API request failed")
+})
+
+test_that("query_groq validates local parameters", {
+  expect_error(query_groq("hello", api_key = "key", top_p = 2), "`top_p` must be between 0 and 1.")
+  expect_error(query_groq("hello", api_key = "key", stream = "yes"), "`stream` must be TRUE or FALSE.")
 })
 
 test_that("list_openrouter_models returns a data table or json list", {
@@ -177,6 +184,8 @@ test_that("query_openrouter returns text, json, and API errors", {
   )
 
   expect_error(query_openrouter("hello", api_key = "key"), "OpenRouter API error: bad request")
+  expect_error(query_openrouter("hello", api_key = "key", temperature = -1), "`temperature` must be greater than or equal to 0.")
+  expect_error(query_openrouter("hello", api_key = "key", top_p = 2), "`top_p` must be between 0 and 1.")
 })
 
 test_that("query_cerebras returns text, json, and validates prompt", {

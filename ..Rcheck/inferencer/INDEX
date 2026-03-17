@@ -1,0 +1,8 @@
+list_gemini_models      List Gemini Models
+list_groq_models        List Groq Models
+list_openrouter_models
+                        List OpenRouter Models
+query_cerebras          Query a Cerebras Chat Model
+query_gemini            Query a Gemini Model
+query_groq              Query a Groq Chat Model
+query_openrouter        Query an OpenRouter Chat Model

@@ -1,6 +1,7 @@
 Package: inferencer
 Type: Package
-Title: Simple Unified Wrappers for Hosted Foundation Model Inference APIs
+Title: Simple Unified Wrappers for Hosted Foundation Model Inference
+        APIs
 Version: 0.1.0
 Authors@R: 
     person(
@@ -22,19 +23,11 @@ Description: Provides lightweight R wrappers for querying and listing models
 License: MIT + file LICENSE
 URL: https://github.com/OliverLDS/inferencer
 BugReports: https://github.com/OliverLDS/inferencer/issues
-Depends:
-    R (>= 4.1.0)
+Depends: R (>= 4.1.0)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
-Imports:
-    curl,
-    data.table,
-    httr,
-    httr2,
-    jsonlite
-Suggests:
-    knitr,
-    rmarkdown,
-    testthat
+Imports: curl, data.table, httr, httr2, jsonlite
+Suggests: knitr, rmarkdown, testthat
 Config/testthat/edition: 3
+Built: R 4.2.3; ; 2026-03-17 12:41:01 UTC; unix

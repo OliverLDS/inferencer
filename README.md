@@ -116,7 +116,7 @@ Use a free model:
 ```r
 query_openrouter(
   prompt = "Rewrite this in a more professional tone: our app is pretty good at searching files",
-  model = "meta-llama/llama-3.3-70b-instruct:free",
+  model = "stepfun/step-3.5-flash:free",
   temperature = 0
 )
 ```

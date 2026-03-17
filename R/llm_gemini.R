@@ -102,12 +102,24 @@ query_gemini <- function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"),
     stop("`temperature` must be a single numeric value.", call. = FALSE)
   }
 
+  if (temperature < 0) {
+    stop("`temperature` must be greater than or equal to 0.", call. = FALSE)
+  }
+
   if (!is.numeric(top_p) || length(top_p) != 1 || is.na(top_p)) {
     stop("`top_p` must be a single numeric value.", call. = FALSE)
   }
 
+  if (top_p < 0 || top_p > 1) {
+    stop("`top_p` must be between 0 and 1.", call. = FALSE)
+  }
+
   if (!is.numeric(top_k) || length(top_k) != 1 || is.na(top_k)) {
     stop("`top_k` must be a single numeric value.", call. = FALSE)
+  }
+
+  if (top_k < 1 || top_k != as.integer(top_k)) {
+    stop("`top_k` must be a single positive integer.", call. = FALSE)
   }
 
   model <- match.arg(model)
