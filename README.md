@@ -10,13 +10,17 @@ It currently supports:
 - OpenRouter
 - Cerebras
 
-The package is intentionally minimal. It focuses on two common tasks:
+The package is intentionally minimal. It focuses on a few common tasks:
 
 1. listing available models from each provider
 2. sending simple prompt-based inference requests
+3. requesting embeddings
+4. working with image-generation and multimodal model inputs
 
 It also includes Gemini TTS support through `query_gemini()` plus
-`write_gemini_audio()`.
+`write_gemini_audio()`, OpenRouter and Gemini embedding helpers, Gemini and
+OpenRouter image-generation helpers, and lower-level multimodal wrappers for
+non-text inputs.
 
 More advanced provider-specific parameters may be added gradually in future versions.
 
@@ -125,6 +129,29 @@ audio_b64 <- query_gemini(
 write_gemini_audio(audio_b64, "out.wav", format = "wav")
 ```
 
+Gemini embeddings:
+
+```r
+embed_gemini(c("machine learning", "data science"))
+```
+
+Gemini text-to-image:
+
+```r
+img_b64 <- generate_image_gemini("A watercolor skyline at sunrise")
+```
+
+Gemini multimodal input:
+
+```r
+query_gemini_content(
+  parts = list(
+    list(text = "Describe this audio clip."),
+    list(inlineData = list(mimeType = "audio/mp3", data = "BASE64_AUDIO_HERE"))
+  )
+)
+```
+
 ### Groq
 
 ```r
@@ -155,6 +182,32 @@ query_openrouter(
   prompt = "Rewrite this in a more professional tone: our app is pretty good at searching files",
   model = "stepfun/step-3.5-flash:free",
   temperature = 0
+)
+```
+
+OpenRouter embeddings:
+
+```r
+embed_openrouter(c("alpha", "beta"))
+```
+
+OpenRouter text-to-image:
+
+```r
+generate_image_openrouter(
+  "A minimalist product photo of a mechanical keyboard on oak"
+)
+```
+
+OpenRouter multimodal input:
+
+```r
+query_openrouter_content(
+  content = list(
+    list(type = "text", text = "What is in this image?"),
+    list(type = "image_url", image_url = list(url = "https://example.com/cat.png"))
+  ),
+  model = "meta-llama/llama-3.3-70b-instruct:free"
 )
 ```
 
@@ -208,9 +261,8 @@ names(gm_json)
   - `imagen-4.0-ultra-generate-001`
   - `imagen-4.0-fast-generate-001`
 
-Note: this package currently wraps Gemini text generation and Gemini TTS.
-Gemini embeddings and Imagen text-to-image use different API patterns and are
-not yet wrapped here.
+Note: provider support differs by modality and model family. Model IDs and
+capabilities should still be checked against the live provider model catalogs.
 
 ### OpenRouter free models
 

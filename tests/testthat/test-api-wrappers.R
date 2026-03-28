@@ -54,6 +54,44 @@ test_that("query_gemini returns text and validates prompt", {
   expect_error(query_gemini("hello", api_key = "key", top_k = 0), "`top_k` must be a single positive integer.")
 })
 
+test_that("query_gemini_content accepts explicit multimodal parts", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      req$body <- body
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"candidates":[{"content":{"parts":[{"text":"Multimodal reply"}]}}]}'
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  parts <- list(
+    list(text = "Describe this clip"),
+    list(inlineData = list(mimeType = "audio/mp3", data = "AQID"))
+  )
+
+  expect_equal(
+    query_gemini_content(parts = parts, api_key = "key", model = "gemini-2.5-flash"),
+    "Multimodal reply"
+  )
+  expect_error(
+    query_gemini_content(prompt = "hello", parts = parts, api_key = "key", model = "gemini-2.5-flash"),
+    "Supply either `prompt` or `parts`, not both."
+  )
+})
+
 test_that("query_gemini can return base64 audio data", {
   testthat::local_mocked_bindings(
     request = function(url) structure(list(url = url), class = "request"),
@@ -93,6 +131,61 @@ test_that("query_gemini can return base64 audio data", {
     json_list = TRUE
   )
   expect_equal(json$candidates[[1]]$content$parts[[1]]$inlineData$data, "AQID")
+})
+
+test_that("embed_gemini returns numeric matrices for single and batch inputs", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      req$body <- body
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      body <- if (grepl("batchEmbedContents", req$url, fixed = TRUE)) {
+        '{"embeddings":[{"values":[0.1,0.2]},{"values":[0.3,0.4]}]}'
+      } else {
+        '{"embedding":{"values":[0.1,0.2]}}'
+      }
+
+      structure(list(status = 200L, body = body), class = "httr2_response")
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  single <- embed_gemini("hello", api_key = "key")
+  expect_equal(dim(single), c(1, 2))
+  expect_equal(single[1, ], c(0.1, 0.2))
+
+  batch <- embed_gemini(c("hello", "world"), api_key = "key")
+  expect_equal(dim(batch), c(2, 2))
+  expect_equal(batch[2, ], c(0.3, 0.4))
+})
+
+test_that("generate_image_gemini returns base64 image payloads", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"candidates":[{"content":{"parts":[{"text":"Here is your image"},{"inlineData":{"mimeType":"image/png","data":"iVBORw0KGgo="}}]}}]}'
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_equal(generate_image_gemini("draw a cat", api_key = "key"), "iVBORw0KGgo=")
 })
 
 test_that("write_gemini_audio writes pcm and wav files", {
@@ -258,6 +351,92 @@ test_that("query_openrouter returns text, json, and API errors", {
   expect_error(query_openrouter("hello", api_key = "key"), "OpenRouter API error: bad request")
   expect_error(query_openrouter("hello", api_key = "key", temperature = -1), "`temperature` must be greater than or equal to 0.")
   expect_error(query_openrouter("hello", api_key = "key", top_p = 2), "`top_p` must be between 0 and 1.")
+})
+
+test_that("query_openrouter_content accepts multimodal content blocks", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      req$body <- body
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"choices":[{"message":{"content":"Vision reply"}}]}'
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  content <- list(
+    list(type = "text", text = "What is in this image?"),
+    list(type = "image_url", image_url = list(url = "https://example.com/test.png"))
+  )
+
+  expect_equal(
+    query_openrouter_content(content, api_key = "key", model = "meta-llama/llama-3.3-70b-instruct:free"),
+    "Vision reply"
+  )
+})
+
+test_that("embed_openrouter returns a numeric matrix", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"data":[{"embedding":[0.1,0.2]},{"embedding":[0.3,0.4]}]}'
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  embeddings <- embed_openrouter(c("hello", "world"), api_key = "key")
+  expect_equal(dim(embeddings), c(2, 2))
+  expect_equal(embeddings[1, ], c(0.1, 0.2))
+  expect_error(embed_openrouter("hello", api_key = "key", encoding_format = "base64"), "json_list = TRUE")
+})
+
+test_that("generate_image_openrouter returns the first image url", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"choices":[{"message":{"images":[{"image_url":{"url":"https://example.com/image.png"}}]}}]}'
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_equal(
+    generate_image_openrouter("draw a skyline", api_key = "key"),
+    "https://example.com/image.png"
+  )
 })
 
 test_that("query_cerebras returns text, json, and validates prompt", {

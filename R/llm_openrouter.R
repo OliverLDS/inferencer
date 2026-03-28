@@ -56,7 +56,7 @@ list_openrouter_models <- function(
 #' @export
 query_openrouter <- function(
   prompt,
-  model = c("openrouter/hunter-alpha", "stepfun/step-3.5-flash:free", "arcee-ai/trinity-large-preview:free", "meta-llama/llama-3.3-70b-instruct:free", 'openrouter/healer-alpha', 'z-ai/glm-4.5-air:free'), # not complete; you can get complete free model list by: rs <- list_openrouter_models; rs[rs$pricing.prompt <= 0, ]
+  model = "openrouter/hunter-alpha", # other current free options can be inspected from list_openrouter_models()
   temperature = 0,
   top_p = 1,
   max_tokens = 512L,
@@ -65,65 +65,15 @@ query_openrouter <- function(
   url = Sys.getenv("OPENROUTER_API_URL", unset = "https://openrouter.ai/api/v1/chat/completions"),
   json_list = FALSE
 ) {
-  if (!is.character(prompt) || length(prompt) != 1 || !nzchar(prompt)) {
-    stop("`prompt` must be a non-empty character string.", call. = FALSE)
-  }
-  .require_api_key(api_key, "OPENROUTER_API_KEY")
-
-  if (!is.numeric(temperature) || length(temperature) != 1 || is.na(temperature)) {
-    stop("`temperature` must be a single numeric value.", call. = FALSE)
-  }
-
-  if (temperature < 0) {
-    stop("`temperature` must be greater than or equal to 0.", call. = FALSE)
-  }
-
-  if (!is.numeric(top_p) || length(top_p) != 1 || is.na(top_p)) {
-    stop("`top_p` must be a single numeric value.", call. = FALSE)
-  }
-
-  if (top_p < 0 || top_p > 1) {
-    stop("`top_p` must be between 0 and 1.", call. = FALSE)
-  }
-
-  if (!is.numeric(max_tokens) || length(max_tokens) != 1 || is.na(max_tokens) || max_tokens < 1) {
-    stop("`max_tokens` must be a single positive number.", call. = FALSE)
-  }
-
-  if (!is.logical(reasoning) || length(reasoning) != 1 || is.na(reasoning)) {
-    stop("`reasoning` must be TRUE or FALSE.", call. = FALSE)
-  }
-    
-  model <- match.arg(model)
-
-  body <- list(
+  query_openrouter_content(
+    content = prompt,
     model = model,
-    messages = list(
-      list(
-        role = "user",
-        content = prompt
-      )
-    ),
     temperature = temperature,
     top_p = top_p,
     max_tokens = max_tokens,
-    reasoning = list(
-      enabled = reasoning
-    )
-  )
-
-  resp <- .perform_json_request(
+    reasoning = reasoning,
+    api_key = api_key,
     url = url,
-    headers = list(
-      "Content-Type" = "application/json",
-      "Authorization" = paste("Bearer", api_key)
-    ),
-    body = body
+    json_list = json_list
   )
-  parsed <- .parse_json_response(resp)
-  .stop_for_json_response(resp, parsed, "OpenRouter API request failed: ", "OpenRouter API error")
-  json <- parsed$json
-
-  if (json_list) return(json)
-  .extract_openai_chat_content(json, "OpenRouter")
 }

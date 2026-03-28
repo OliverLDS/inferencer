@@ -1,3 +1,9 @@
+# inferencer 0.1.3
+
+- Added Gemini and OpenRouter embedding helpers.
+- Added Gemini and OpenRouter image-generation helpers.
+- Added Gemini and OpenRouter multimodal query wrappers for generic non-text inputs.
+
 # inferencer 0.1.2
 
 - Standardized provider HTTP requests on `httr2`.

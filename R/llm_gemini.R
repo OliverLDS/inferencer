@@ -32,20 +32,6 @@
   FALSE
 }
 
-.extract_gemini_part <- function(parsed) {
-  if (is.null(parsed$candidates) || length(parsed$candidates) < 1) {
-    stop("Gemini API returned no candidates.", call. = FALSE)
-  }
-
-  parts <- parsed$candidates[[1]]$content$parts
-
-  if (is.null(parts) || length(parts) < 1) {
-    stop("Gemini API returned no content parts.", call. = FALSE)
-  }
-
-  parts[[1]]
-}
-
 .wav_header <- function(data_size, sample_rate, channels, bits_per_sample) {
   byte_rate <- as.integer(sample_rate * channels * bits_per_sample / 8L)
   block_align <- as.integer(channels * bits_per_sample / 8L)
@@ -122,120 +108,24 @@ list_gemini_models <- function(api_key = Sys.getenv("GEMINI_API_KEY"), url = "ht
 #'   list when `json_list = TRUE`.
 #' @export
 query_gemini <- function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"),
-  model = c("gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemini-2.5-flash-preview-tts", "gemini-embedding-001", "gemma-3-27b-it", "gemma-3n-e2b-it"), # just list some common models here; if you want the complete list of free models, you can rs <- list_gemini_models(); rs[sapply(rs$name, .has_free_tier), name]
+  model = "gemini-2.5-flash", # some common free models include gemini-2.5-pro, gemini-2.5-flash-lite, gemini-2.5-flash-preview-tts, gemini-embedding-001, gemma-3-27b-it, and gemma-3n-e2b-it
   url0 = Sys.getenv("GEMINI_API_URL", unset = "https://generativelanguage.googleapis.com/v1beta/models"),
   temperature = 0.7, top_p = 1, top_k = 40, max_tokens = NULL, 
   response_modalities = NULL, speech_config = NULL,
   json_list = FALSE) {
-
-  if (!is.character(prompt) || length(prompt) != 1 || !nzchar(prompt)) {
-    stop("`prompt` must be a non-empty character string.", call. = FALSE)
-  }
-
-  .require_api_key(api_key, "GEMINI_API_KEY")
-
-  if (!is.numeric(temperature) || length(temperature) != 1 || is.na(temperature)) {
-    stop("`temperature` must be a single numeric value.", call. = FALSE)
-  }
-
-  if (temperature < 0) {
-    stop("`temperature` must be greater than or equal to 0.", call. = FALSE)
-  }
-
-  if (!is.numeric(top_p) || length(top_p) != 1 || is.na(top_p)) {
-    stop("`top_p` must be a single numeric value.", call. = FALSE)
-  }
-
-  if (top_p < 0 || top_p > 1) {
-    stop("`top_p` must be between 0 and 1.", call. = FALSE)
-  }
-
-  if (!is.numeric(top_k) || length(top_k) != 1 || is.na(top_k)) {
-    stop("`top_k` must be a single numeric value.", call. = FALSE)
-  }
-
-  if (top_k < 1 || top_k != as.integer(top_k)) {
-    stop("`top_k` must be a single positive integer.", call. = FALSE)
-  }
-
-  model <- match.arg(model)
-
-  if (!is.null(max_tokens)) {
-    if (!is.numeric(max_tokens) || length(max_tokens) != 1 || is.na(max_tokens) || max_tokens < 1) {
-      stop("`max_tokens` must be a single positive number or NULL.", call. = FALSE)
-    }
-  }
-
-  if (!is.null(response_modalities)) {
-    if (!is.character(response_modalities) || length(response_modalities) < 1 || any(!nzchar(response_modalities))) {
-      stop("`response_modalities` must be a non-empty character vector or NULL.", call. = FALSE)
-    }
-  }
-
-  if (!is.null(speech_config) && !is.list(speech_config)) {
-    stop("`speech_config` must be a list or NULL.", call. = FALSE)
-  }
-  
-  url <- sprintf("%s/%s:generateContent?key=%s", url0, model, api_key)
-  
-  body <- list(
-    contents = list(list(
-      role = "user",
-      parts = list(list(text = prompt))
-    )),
-    generationConfig = list(
-      temperature = temperature,
-      topP = top_p,
-      topK = top_k
-    )
+  query_gemini_content(
+    prompt = prompt,
+    api_key = api_key,
+    model = model,
+    url0 = url0,
+    temperature = temperature,
+    top_p = top_p,
+    top_k = top_k,
+    max_tokens = max_tokens,
+    response_modalities = response_modalities,
+    speech_config = speech_config,
+    json_list = json_list
   )
-
-  if (!is.null(max_tokens)) {
-    body$generationConfig$maxOutputTokens <- max_tokens
-  }
-
-  if (!is.null(response_modalities)) {
-    body$generationConfig$responseModalities <- unname(response_modalities)
-  }
-
-  if (!is.null(speech_config)) {
-    body$generationConfig$speechConfig <- speech_config
-  }
-
-  response <- .perform_json_request(
-    url = url,
-    headers = list(`Content-Type` = "application/json"),
-    body = body
-  )
-  parsed_resp <- .parse_json_response(response)
-  .stop_for_json_response(response, parsed_resp, "Gemini API request failed: ", NULL)
-  parsed <- parsed_resp$json
-
-  if (json_list) return(parsed)
-
-  part <- .extract_gemini_part(parsed)
-
-  if (!is.null(part$text)) {
-    text <- part$text
-
-    if (!is.character(text) || length(text) != 1 || !nzchar(text)) {
-      stop("Gemini API returned no text content.", call. = FALSE)
-    }
-
-    return(text)
-  }
-
-  if (!is.null(part$inlineData) && !is.null(part$inlineData$data)) {
-    audio_data <- part$inlineData$data
-
-    if (!is.character(audio_data) || length(audio_data) != 1 || !nzchar(audio_data)) {
-      stop("Gemini API returned no audio data.", call. = FALSE)
-    }
-
-    return(audio_data)
-  }
-
-  stop("Gemini API returned neither text nor audio content.", call. = FALSE)
 }
 
 #' Write Gemini Audio to a File
