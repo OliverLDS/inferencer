@@ -15,35 +15,17 @@ list_openrouter_models <- function(
   url = "https://openrouter.ai/api/v1/models",
   json_list = FALSE
 ) {
-  if (!nzchar(api_key)) {
-    stop("OPENROUTER_API_KEY is not set.", call. = FALSE)
-  }
-  
-  response <- curl::curl_fetch_memory(
-    url,
-    handle = curl::new_handle(
-      httpheader = c(
-        "Authorization" = paste("Bearer", api_key)
-      )
+  .require_api_key(api_key, "OPENROUTER_API_KEY")
+
+  response <- .perform_json_request(
+    url = url,
+    headers = list(
+      "Authorization" = paste("Bearer", api_key)
     )
   )
-
-  txt <- rawToChar(response$content)
-
-  if (response$status_code >= 300) {
-    stop("OpenRouter API request failed: ", txt, call. = FALSE)
-  }
-  
-  res <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
-
-  if (!is.null(res$error)) {
-    if (!is.null(res$error$message) && nzchar(res$error$message)) {
-      msg <- res$error$message
-    } else {
-      msg <- "Unknown API error."
-    }
-    stop(sprintf("OpenRouter API error: %s", msg), call. = FALSE)
-  }
+  parsed <- .parse_json_response(response)
+  .stop_for_json_response(response, parsed, "OpenRouter API request failed: ", "OpenRouter API error")
+  res <- parsed$json
 
   if (json_list) return(res)
   
@@ -51,25 +33,7 @@ list_openrouter_models <- function(
     stop("Response does not contain a 'data' field.", call. = FALSE)
   }
   
-  # need to handle nested list strucutre which may contain different number of items across models
-  rows <- lapply(res$data, function(x) {
-    x$architecture <- list(x$architecture)
-    x$pricing <- list(x$pricing)
-    x$top_provider <- list(x$top_provider)
-    x$per_request_limits <- list(x$per_request_limits)
-    x$supported_parameters <- list(x$supported_parameters)
-    x$default_parameters <- list(x$default_parameters)
-  
-    for (nm in names(x)) {
-      if (length(x[[nm]]) == 0) {
-        x[[nm]] <- NA
-      }
-    }
-  
-    x
-  })
-  
-  data.table::rbindlist(rows, fill = TRUE)
+  .openrouter_model_rows(res$data)
 }
 
 #' Query an OpenRouter Chat Model
@@ -104,7 +68,7 @@ query_openrouter <- function(
   if (!is.character(prompt) || length(prompt) != 1 || !nzchar(prompt)) {
     stop("`prompt` must be a non-empty character string.", call. = FALSE)
   }
-  if (!nzchar(api_key)) stop("OPENROUTER_API_KEY is not set.", call. = FALSE)
+  .require_api_key(api_key, "OPENROUTER_API_KEY")
 
   if (!is.numeric(temperature) || length(temperature) != 1 || is.na(temperature)) {
     stop("`temperature` must be a single numeric value.", call. = FALSE)
@@ -148,49 +112,18 @@ query_openrouter <- function(
     )
   )
 
-  resp <- httr2::request(url) |>
-    httr2::req_headers(
+  resp <- .perform_json_request(
+    url = url,
+    headers = list(
       "Content-Type" = "application/json",
       "Authorization" = paste("Bearer", api_key)
-    ) |>
-    httr2::req_body_json(body, auto_unbox = TRUE) |>
-    httr2::req_error(is_error = function(resp) FALSE) |>
-    httr2::req_perform()
-
-  txt <- httr2::resp_body_string(resp)
-  json <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
-  
-  if (httr2::resp_status(resp) >= 300) {
-    if (!is.null(json$error) && !is.null(json$error$message) && nzchar(json$error$message)) {
-      stop(sprintf("OpenRouter API error: %s", json$error$message), call. = FALSE)
-    }
-    stop("OpenRouter API request failed: ", txt, call. = FALSE)
-  }
-
-  if (!is.null(json$error)) {
-    if (!is.null(json$error$message) && nzchar(json$error$message)) {
-      msg <- json$error$message
-    } else {
-      msg <- "Unknown API error."
-    }
-    stop(sprintf("OpenRouter API error: %s", msg), call. = FALSE)
-  }
+    ),
+    body = body
+  )
+  parsed <- .parse_json_response(resp)
+  .stop_for_json_response(resp, parsed, "OpenRouter API request failed: ", "OpenRouter API error")
+  json <- parsed$json
 
   if (json_list) return(json)
-
-  if (is.null(json$choices) || length(json$choices) < 1) {
-    stop("API returned no choices.", call. = FALSE)
-  }
-
-  if (is.null(json$choices[[1]]$message)) {
-    stop("API returned no message object.", call. = FALSE)
-  }
-
-  content <- json$choices[[1]]$message$content
-
-  if (!is.character(content) || length(content) != 1 || !nzchar(content)) {
-    stop("API returned no message content.", call. = FALSE)
-  }
-
-  content
+  .extract_openai_chat_content(json, "OpenRouter")
 }

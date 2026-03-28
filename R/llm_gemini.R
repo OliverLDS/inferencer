@@ -83,19 +83,12 @@
 #'   `json_list = TRUE`.
 #' @export
 list_gemini_models <- function(api_key = Sys.getenv("GEMINI_API_KEY"), url = "https://generativelanguage.googleapis.com/v1beta/models", json_list = FALSE) {
+  .require_api_key(api_key, "GEMINI_API_KEY")
 
-  if (!nzchar(api_key)) {
-    stop("GEMINI_API_KEY is not set.", call. = FALSE)
-  }
-
-  response <- httr::GET(paste0(url, "?key=", api_key))
-  txt <- httr::content(response, as = "text", encoding = "UTF-8")
-
-  if (httr::status_code(response) >= 300) {
-    stop("Gemini API request failed: ", txt, call. = FALSE)
-  }
-
-  res <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
+  response <- .perform_json_request(sprintf("%s?key=%s", url, api_key))
+  parsed <- .parse_json_response(response)
+  .stop_for_json_response(response, parsed, "Gemini API request failed: ", NULL)
+  res <- parsed$json
 
   if (json_list) return(res)
 
@@ -139,9 +132,7 @@ query_gemini <- function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"),
     stop("`prompt` must be a non-empty character string.", call. = FALSE)
   }
 
-  if (!nzchar(api_key)) {
-    stop("GEMINI_API_KEY is not set.", call. = FALSE)
-  }
+  .require_api_key(api_key, "GEMINI_API_KEY")
 
   if (!is.numeric(temperature) || length(temperature) != 1 || is.na(temperature)) {
     stop("`temperature` must be a single numeric value.", call. = FALSE)
@@ -211,20 +202,14 @@ query_gemini <- function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"),
     body$generationConfig$speechConfig <- speech_config
   }
 
-  response <- httr::POST(
-    url,
-    httr::add_headers(`Content-Type` = "application/json"),
-    body = jsonlite::toJSON(body, auto_unbox = TRUE),
-    encode = "raw"
+  response <- .perform_json_request(
+    url = url,
+    headers = list(`Content-Type` = "application/json"),
+    body = body
   )
-
-  txt <- httr::content(response, as = "text", encoding = "UTF-8")
-
-  if (httr::status_code(response) >= 300) {
-    stop("Gemini API request failed: ", txt, call. = FALSE)
-  }
-
-  parsed <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
+  parsed_resp <- .parse_json_response(response)
+  .stop_for_json_response(response, parsed_resp, "Gemini API request failed: ", NULL)
+  parsed <- parsed_resp$json
 
   if (json_list) return(parsed)
 

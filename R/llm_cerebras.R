@@ -21,9 +21,7 @@ query_cerebras <- function(prompt,
     stop("`prompt` must be a non-empty character string.", call. = FALSE)
   }
 
-  if (!nzchar(api_key)) {
-    stop("CEREBRAS_API_KEY is not set.", call. = FALSE)
-  }
+  .require_api_key(api_key, "CEREBRAS_API_KEY")
 
   model <- match.arg(model)
 
@@ -37,38 +35,18 @@ query_cerebras <- function(prompt,
     top_p = 1
   )
 
-  res <- httr::POST(
-    url,
-    httr::add_headers(
+  res <- .perform_json_request(
+    url = url,
+    headers = list(
       "Content-Type" = "application/json",
       "Authorization" = paste("Bearer", api_key)
     ),
-    body = jsonlite::toJSON(body, auto_unbox = TRUE)
+    body = body
   )
-
-  txt <- httr::content(res, "text", encoding = "UTF-8")
-
-  if (httr::status_code(res) >= 300) {
-    stop("Cerebras API request failed: ", txt, call. = FALSE)
-  }
-
-  json <- jsonlite::fromJSON(txt, simplifyVector = FALSE)
+  parsed <- .parse_json_response(res)
+  .stop_for_json_response(res, parsed, "Cerebras API request failed: ", NULL)
+  json <- parsed$json
 
   if (json_list) return(json)
-
-  if (is.null(json$choices) || length(json$choices) < 1) {
-    stop("Cerebras API returned no choices.", call. = FALSE)
-  }
-
-  if (is.null(json$choices[[1]]$message)) {
-    stop("Cerebras API returned no message object.", call. = FALSE)
-  }
-
-  content <- json$choices[[1]]$message$content
-
-  if (!is.character(content) || length(content) != 1 || !nzchar(content)) {
-    stop("Cerebras API returned no message content.", call. = FALSE)
-  }
-
-  content
+  .extract_openai_chat_content(json, "Cerebras")
 }

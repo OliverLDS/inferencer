@@ -1,19 +1,19 @@
 test_that("list_gemini_models returns a data table or json list", {
   testthat::local_mocked_bindings(
-    GET = function(...) {
+    request = function(url) structure(list(url = url), class = "request"),
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
       structure(
         list(
           status = 200L,
           body = '{"models":[{"name":"models/gemini-2.5-flash","displayName":"Gemini 2.5 Flash"}]}'
         ),
-        class = "response"
+        class = "httr2_response"
       )
     },
-    content = function(x, as = NULL, encoding = NULL, ...) {
-      if (identical(as, "text")) x$body else stop("unexpected content mode")
-    },
-    status_code = function(x) x$status,
-    .package = "httr"
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
   )
 
   models <- list_gemini_models(api_key = "key")
@@ -26,20 +26,22 @@ test_that("list_gemini_models returns a data table or json list", {
 
 test_that("query_gemini returns text and validates prompt", {
   testthat::local_mocked_bindings(
-    POST = function(...) {
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
       structure(
         list(
           status = 200L,
           body = '{"candidates":[{"content":{"parts":[{"text":"Gemini reply"}]}}]}'
         ),
-        class = "response"
+        class = "httr2_response"
       )
     },
-    content = function(x, as = NULL, encoding = NULL, ...) {
-      if (identical(as, "text")) x$body else stop("unexpected content mode")
-    },
-    status_code = function(x) x$status,
-    .package = "httr"
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
   )
 
   expect_equal(query_gemini("hello", api_key = "key"), "Gemini reply")
@@ -54,20 +56,22 @@ test_that("query_gemini returns text and validates prompt", {
 
 test_that("query_gemini can return base64 audio data", {
   testthat::local_mocked_bindings(
-    POST = function(...) {
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
       structure(
         list(
           status = 200L,
           body = '{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"audio/pcm","data":"AQID"}}]}}]}'
         ),
-        class = "response"
+        class = "httr2_response"
       )
     },
-    content = function(x, as = NULL, encoding = NULL, ...) {
-      if (identical(as, "text")) x$body else stop("unexpected content mode")
-    },
-    status_code = function(x) x$status,
-    .package = "httr"
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
   )
 
   expect_equal(
@@ -137,34 +141,38 @@ test_that("list_groq_models returns a data table or json list", {
 
 test_that("query_groq returns text and surfaces API errors", {
   testthat::local_mocked_bindings(
-    POST = function(...) {
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
       structure(
         list(
           status = 200L,
           body = '{"choices":[{"message":{"content":"Groq reply"}}]}'
         ),
-        class = "response"
+        class = "httr2_response"
       )
     },
-    content = function(x, as = NULL, encoding = NULL, ...) {
-      if (identical(as, "text")) x$body else stop("unexpected content mode")
-    },
-    status_code = function(x) x$status,
-    .package = "httr"
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
   )
 
   expect_equal(query_groq("hello", api_key = "key"), "Groq reply")
   expect_equal(query_groq("hello", api_key = "key", json_list = TRUE)$choices[[1]]$message$content, "Groq reply")
 
   testthat::local_mocked_bindings(
-    POST = function(...) {
-      structure(list(status = 401L, body = '{"error":{"message":"bad key"}}'), class = "response")
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(list(status = 401L, body = '{"error":{"message":"bad key"}}'), class = "httr2_response")
     },
-    content = function(x, as = NULL, encoding = NULL, ...) {
-      if (identical(as, "text")) x$body else stop("unexpected content mode")
-    },
-    status_code = function(x) x$status,
-    .package = "httr"
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
   )
 
   expect_error(query_groq("hello", api_key = "key"), "Groq API request failed")
@@ -177,13 +185,21 @@ test_that("query_groq validates local parameters", {
 
 test_that("list_openrouter_models returns a data table or json list", {
   testthat::local_mocked_bindings(
-    curl_fetch_memory = function(...) {
-      list(
-        status_code = 200L,
-        content = charToRaw('{"data":[{"id":"model-a","name":"Model A"}]}')
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"data":[{"id":"model-a","name":"Model A"}]}'
+        ),
+        class = "httr2_response"
       )
     },
-    .package = "curl"
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
   )
 
   models <- list_openrouter_models(api_key = "key")
@@ -246,20 +262,22 @@ test_that("query_openrouter returns text, json, and API errors", {
 
 test_that("query_cerebras returns text, json, and validates prompt", {
   testthat::local_mocked_bindings(
-    POST = function(...) {
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
       structure(
         list(
           status = 200L,
           body = '{"choices":[{"message":{"content":"Cerebras reply"}}]}'
         ),
-        class = "response"
+        class = "httr2_response"
       )
     },
-    content = function(x, as = NULL, encoding = NULL, ...) {
-      if (identical(as, "text")) x$body else stop("unexpected content mode")
-    },
-    status_code = function(x) x$status,
-    .package = "httr"
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
   )
 
   expect_equal(query_cerebras("hello", api_key = "key"), "Cerebras reply")
