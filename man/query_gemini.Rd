@@ -16,6 +16,8 @@ query_gemini(
   top_p = 1,
   top_k = 40,
   max_tokens = NULL,
+  response_modalities = NULL,
+  speech_config = NULL,
   json_list = FALSE
 )
 }
@@ -36,11 +38,18 @@ query_gemini(
 
 \item{max_tokens}{Optional maximum number of output tokens.}
 
+\item{response_modalities}{Optional response modalities, for example
+\code{c("TEXT")} or \code{c("AUDIO")}.}
+
+\item{speech_config}{Optional Gemini \code{speechConfig} object supplied as an R
+list.}
+
 \item{json_list}{If \code{TRUE}, return the parsed JSON response as a list.}
 }
 \value{
-A character string by default, or a parsed JSON list when
-\code{json_list = TRUE}.
+A character string by default. For audio responses, returns the
+base64-encoded audio data from \code{inlineData$data}. Returns the parsed JSON
+list when \code{json_list = TRUE}.
 }
 \description{
 Sends a single user prompt to the Gemini \code{generateContent} API.

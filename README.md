@@ -15,6 +15,9 @@ The package is intentionally minimal. It focuses on two common tasks:
 1. listing available models from each provider
 2. sending simple prompt-based inference requests
 
+It also includes Gemini TTS support through `query_gemini()` plus
+`write_gemini_audio()`.
+
 More advanced provider-specific parameters may be added gradually in future versions.
 
 ## Basic setup
@@ -88,6 +91,40 @@ query_gemini(
 )
 ```
 
+Gemini TTS:
+
+```r
+audio_b64 <- query_gemini(
+  prompt = paste(
+    "TTS the following conversation between Joe and Jane:",
+    "Joe: Hows it going today Jane?",
+    "Jane: Not too bad, how about you?"
+  ),
+  model = "gemini-2.5-flash-preview-tts",
+  response_modalities = "AUDIO",
+  speech_config = list(
+    multiSpeakerVoiceConfig = list(
+      speakerVoiceConfigs = list(
+        list(
+          speaker = "Joe",
+          voiceConfig = list(
+            prebuiltVoiceConfig = list(voiceName = "Kore")
+          )
+        ),
+        list(
+          speaker = "Jane",
+          voiceConfig = list(
+            prebuiltVoiceConfig = list(voiceName = "Puck")
+          )
+        )
+      )
+    )
+  )
+)
+
+write_gemini_audio(audio_b64, "out.wav", format = "wav")
+```
+
 ### Groq
 
 ```r
@@ -158,9 +195,35 @@ gm_json <- list_gemini_models(json_list = TRUE)
 names(gm_json)
 ```
 
+### Gemini model families currently visible in the API
+
+- TTS:
+  - `gemini-2.5-flash-preview-tts`
+  - `gemini-2.5-pro-preview-tts`
+- Embeddings:
+  - `gemini-embedding-001`
+  - `gemini-embedding-2-preview`
+- Text-to-image:
+  - `imagen-4.0-generate-001`
+  - `imagen-4.0-ultra-generate-001`
+  - `imagen-4.0-fast-generate-001`
+
+Note: this package currently wraps Gemini text generation and Gemini TTS.
+Gemini embeddings and Imagen text-to-image use different API patterns and are
+not yet wrapped here.
+
 ### OpenRouter free models
 
 ```r
 or_models <- list_openrouter_models()
-or_models[pricing.prompt <= 0]
+or_models[, pricing.prompt := sapply(pricing, `[[`, "prompt")]
+or_models[pricing.prompt == 0]
 ```
+
+### OpenRouter free model notes
+
+- Verified current free embedding model:
+  - `nvidia/llama-nemotron-embed-vl-1b-v2:free`
+- OpenRouter free model availability changes frequently.
+- Free TTS or free text-to-image model IDs should be checked from the current
+  OpenRouter models catalog before use.

@@ -52,6 +52,62 @@ test_that("query_gemini returns text and validates prompt", {
   expect_error(query_gemini("hello", api_key = "key", top_k = 0), "`top_k` must be a single positive integer.")
 })
 
+test_that("query_gemini can return base64 audio data", {
+  testthat::local_mocked_bindings(
+    POST = function(...) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"audio/pcm","data":"AQID"}}]}}]}'
+        ),
+        class = "response"
+      )
+    },
+    content = function(x, as = NULL, encoding = NULL, ...) {
+      if (identical(as, "text")) x$body else stop("unexpected content mode")
+    },
+    status_code = function(x) x$status,
+    .package = "httr"
+  )
+
+  expect_equal(
+    query_gemini(
+      "hello",
+      api_key = "key",
+      model = "gemini-2.5-flash-preview-tts",
+      response_modalities = "AUDIO",
+      speech_config = list(voiceConfig = list(prebuiltVoiceConfig = list(voiceName = "Kore")))
+    ),
+    "AQID"
+  )
+
+  json <- query_gemini(
+    "hello",
+    api_key = "key",
+    model = "gemini-2.5-flash-preview-tts",
+    response_modalities = "AUDIO",
+    json_list = TRUE
+  )
+  expect_equal(json$candidates[[1]]$content$parts[[1]]$inlineData$data, "AQID")
+})
+
+test_that("write_gemini_audio writes pcm and wav files", {
+  pcm_path <- tempfile(fileext = ".pcm")
+  wav_path <- tempfile(fileext = ".wav")
+
+  write_gemini_audio("AQID", pcm_path, format = "pcm")
+  expect_true(file.exists(pcm_path))
+  expect_equal(file.info(pcm_path)$size[[1]], 3)
+
+  write_gemini_audio("AQID", wav_path, format = "wav")
+  expect_true(file.exists(wav_path))
+  expect_true(file.info(wav_path)$size[[1]] > 3)
+
+  con <- file(wav_path, "rb")
+  on.exit(close(con), add = TRUE)
+  expect_equal(rawToChar(readBin(con, "raw", n = 4L)), "RIFF")
+})
+
 test_that("list_groq_models returns a data table or json list", {
   testthat::local_mocked_bindings(
     request = function(url) structure(list(url = url), class = "request"),
