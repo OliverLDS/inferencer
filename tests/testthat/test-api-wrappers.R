@@ -387,6 +387,53 @@ test_that("query_openrouter_content accepts multimodal content blocks", {
   )
 })
 
+test_that("query_openrouter_content parses text blocks and catches truncation", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"choices":[{"finish_reason":"stop","message":{"content":[{"type":"output_text","content":"Block reply"}]}}]}'
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_equal(query_openrouter_content("hello", api_key = "key"), "Block reply")
+
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"choices":[{"finish_reason":"length","message":{"content":"partial"}}]}'
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_error(
+    query_openrouter_content("hello", api_key = "key"),
+    "OpenRouter response was truncated"
+  )
+})
+
 test_that("embed_openrouter returns a numeric matrix", {
   testthat::local_mocked_bindings(
     request = function(url) structure(list(url = url), class = "request"),

@@ -129,6 +129,39 @@
   message
 }
 
+.extract_openai_choice <- function(parsed, provider) {
+  if (is.null(parsed$choices) || length(parsed$choices) < 1) {
+    stop(sprintf("%s API returned no choices.", provider), call. = FALSE)
+  }
+
+  choice <- parsed$choices[[1]]
+
+  if (is.null(choice) || !is.list(choice)) {
+    stop(sprintf("%s API returned an invalid choice object.", provider), call. = FALSE)
+  }
+
+  choice
+}
+
+.openai_choice_finish_reason <- function(choice) {
+  for (field in c("finish_reason", "native_finish_reason")) {
+    value <- choice[[field]]
+    if (is.character(value) && length(value) == 1 && nzchar(value)) {
+      return(value)
+    }
+  }
+
+  NULL
+}
+
+.openai_choice_is_truncated <- function(choice) {
+  finish_reason <- .openai_choice_finish_reason(choice)
+
+  is.character(finish_reason) &&
+    length(finish_reason) == 1 &&
+    finish_reason %in% c("length", "max_tokens")
+}
+
 .extract_openai_message_text <- function(message) {
   if (is.character(message$content) && length(message$content) == 1 && nzchar(message$content)) {
     return(message$content)
@@ -136,8 +169,11 @@
 
   if (is.list(message$content) && length(message$content) >= 1) {
     text_parts <- lapply(message$content, function(part) {
-      if (!is.null(part$text) && is.character(part$text) && length(part$text) == 1 && nzchar(part$text)) {
-        return(part$text)
+      for (field in c("text", "content", "output_text")) {
+        value <- part[[field]]
+        if (is.character(value) && length(value) == 1 && nzchar(value)) {
+          return(value)
+        }
       }
       NULL
     })
@@ -146,6 +182,10 @@
     if (length(text_parts) >= 1) {
       return(paste(unlist(text_parts, use.names = FALSE), collapse = "\n"))
     }
+  }
+
+  if (is.character(message$refusal) && length(message$refusal) == 1 && nzchar(message$refusal)) {
+    return(message$refusal)
   }
 
   NULL

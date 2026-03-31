@@ -1,3 +1,9 @@
+# inferencer 0.1.3.1
+
+- Changed the default OpenRouter model to `openrouter/free`.
+- Increased the default OpenRouter token budget to reduce truncation.
+- Improved OpenRouter response parsing and truncation error handling for alias models.
+
 # inferencer 0.1.3
 
 - Added Gemini and OpenRouter embedding helpers.

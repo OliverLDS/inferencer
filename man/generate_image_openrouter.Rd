@@ -9,7 +9,7 @@ generate_image_openrouter(
   model = "google/gemini-2.5-flash-image-preview",
   temperature = 0,
   top_p = 1,
-  max_tokens = 512L,
+  max_tokens = 2048L,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset =
     "https://openrouter.ai/api/v1/chat/completions"),

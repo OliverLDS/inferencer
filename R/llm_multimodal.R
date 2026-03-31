@@ -302,10 +302,10 @@ generate_image_gemini <- function(prompt,
 #'   the parsed JSON response when `json_list = TRUE`.
 #' @export
 query_openrouter_content <- function(content,
-  model = "openrouter/hunter-alpha",
+  model = "openrouter/free",
   temperature = 0,
   top_p = 1,
-  max_tokens = 512L,
+  max_tokens = 2048L,
   reasoning = TRUE,
   modalities = NULL,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
@@ -383,8 +383,21 @@ query_openrouter_content <- function(content,
     return(json)
   }
 
+  choice <- .extract_openai_choice(json, "OpenRouter")
   message <- .extract_openai_message(json, "OpenRouter")
   text <- .extract_openai_message_text(message)
+
+  if (!is.null(text) && .openai_choice_is_truncated(choice)) {
+    finish_reason <- .openai_choice_finish_reason(choice)
+    stop(
+      sprintf(
+        "OpenRouter response was truncated (`finish_reason = %s`). Increase `max_tokens` or call with `json_list = TRUE`.",
+        finish_reason
+      ),
+      call. = FALSE
+    )
+  }
+
   if (!is.null(text)) {
     return(text)
   }
@@ -394,7 +407,18 @@ query_openrouter_content <- function(content,
     return(image)
   }
 
-  stop("OpenRouter API returned neither text nor image content.", call. = FALSE)
+  message_fields <- paste(names(message), collapse = ", ")
+  if (!nzchar(message_fields)) {
+    message_fields <- "<none>"
+  }
+
+  stop(
+    sprintf(
+      "OpenRouter API returned no parseable text or image content. Message fields: %s. Call with `json_list = TRUE` to inspect the raw response.",
+      message_fields
+    ),
+    call. = FALSE
+  )
 }
 
 #' Request OpenRouter Embeddings
@@ -487,7 +511,7 @@ generate_image_openrouter <- function(prompt,
   model = "google/gemini-2.5-flash-image-preview",
   temperature = 0,
   top_p = 1,
-  max_tokens = 512L,
+  max_tokens = 2048L,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset = "https://openrouter.ai/api/v1/chat/completions"),
   json_list = FALSE) {

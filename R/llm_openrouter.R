@@ -56,10 +56,10 @@ list_openrouter_models <- function(
 #' @export
 query_openrouter <- function(
   prompt,
-  model = "openrouter/hunter-alpha", # other current free options can be inspected from list_openrouter_models()
+  model = "openrouter/free", # other current free options can be inspected from list_openrouter_models()
   temperature = 0,
   top_p = 1,
-  max_tokens = 512L,
+  max_tokens = 2048L,
   reasoning = TRUE,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset = "https://openrouter.ai/api/v1/chat/completions"),

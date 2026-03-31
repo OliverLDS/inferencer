@@ -6,10 +6,10 @@
 \usage{
 query_openrouter(
   prompt,
-  model = "openrouter/hunter-alpha",
+  model = "openrouter/free",
   temperature = 0,
   top_p = 1,
-  max_tokens = 512L,
+  max_tokens = 2048L,
   reasoning = TRUE,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset =
