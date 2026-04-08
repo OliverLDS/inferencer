@@ -486,6 +486,58 @@ test_that("generate_image_openrouter returns the first image url", {
   )
 })
 
+test_that("list_ollama_models returns a data table or json list", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"models":[{"name":"gpt-oss:120b","model":"gpt-oss:120b","details":{"family":"gpt-oss"}}]}'
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  models <- list_ollama_models(api_key = "key")
+  expect_s3_class(models, "data.table")
+  expect_equal(models$name[[1]], "gpt-oss:120b")
+
+  json <- list_ollama_models(api_key = "key", json_list = TRUE)
+  expect_equal(json$models[[1]]$details$family, "gpt-oss")
+})
+
+test_that("query_ollama returns text, json, and validates prompt", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"message":{"role":"assistant","content":"Ollama reply"},"done":true}'
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_equal(query_ollama("hello", api_key = "key"), "Ollama reply")
+  expect_equal(query_ollama("hello", api_key = "key", json_list = TRUE)$message$content, "Ollama reply")
+  expect_error(query_ollama("", api_key = "key"), "`prompt` must be a non-empty character string.")
+})
+
 test_that("query_cerebras returns text, json, and validates prompt", {
   testthat::local_mocked_bindings(
     request = function(url) structure(list(url = url), class = "request"),

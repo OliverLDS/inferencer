@@ -9,6 +9,7 @@ It currently supports:
 - Groq
 - OpenRouter
 - Cerebras
+- Ollama Cloud
 
 The package is intentionally minimal. It focuses on a few common tasks:
 
@@ -33,6 +34,7 @@ Sys.setenv(GEMINI_API_KEY = "your_key_here")
 Sys.setenv(GROQ_API_KEY = "your_key_here")
 Sys.setenv(OPENROUTER_API_KEY = "your_key_here")
 Sys.setenv(CEREBRAS_API_KEY = "your_key_here")
+Sys.setenv(OLLAMA_API_KEY = "your_key_here")
 ```
 
 Load the package:
@@ -74,6 +76,13 @@ Parsed JSON list:
 
 ```r
 openrouter_json <- list_openrouter_models(json_list = TRUE)
+```
+
+### Ollama Cloud
+
+```r
+ollama_models <- list_ollama_models()
+head(ollama_models)
 ```
 
 ## Query models
@@ -226,6 +235,21 @@ query_cerebras(
 )
 ```
 
+### Ollama Cloud
+
+```r
+query_ollama("Explain why the sky is blue.")
+```
+
+Specify model:
+
+```r
+query_ollama(
+  prompt = "Give me a concise explanation of principal component analysis.",
+  model = "gpt-oss:120b"
+)
+```
+
 ## Example workflow: compare outputs across providers
 
 ```r
@@ -235,7 +259,8 @@ list(
   gemini = query_gemini(prompt),
   groq = query_groq(prompt),
   openrouter = query_openrouter(prompt),
-  cerebras = query_cerebras(prompt)
+  cerebras = query_cerebras(prompt),
+  ollama = query_ollama(prompt)
 )
 ```
 

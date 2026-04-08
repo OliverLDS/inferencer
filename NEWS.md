@@ -1,3 +1,8 @@
+# inferencer 0.1.3.2
+
+- Added Ollama Cloud model listing and chat-query wrappers.
+- Updated package metadata to use the maintainer email `oliver.yxzhou@gmail.com`.
+
 # inferencer 0.1.3.1
 
 - Changed the default OpenRouter model to `openrouter/free`.
