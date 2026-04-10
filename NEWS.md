@@ -1,3 +1,10 @@
+# inferencer 0.1.4.1
+
+- Improved the shipped shell markdown renderer for headings, bullets, horizontal rules, and pipe tables.
+- Changed shell query helpers to take prompt as the first argument and optional model override as the second.
+- Made shell query helpers render markdown automatically on successful text responses.
+- Updated `query_fallback()` to use the default models of `query_gemini()`, `query_openrouter()`, and `query_groq()`.
+
 # inferencer 0.1.4
 
 - Added a zsh-oriented shell companion under `inst/shell/inferencer.sh`.

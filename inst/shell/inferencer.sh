@@ -48,6 +48,151 @@ inferencer_normalize_gemini_model() {
   printf '%s\n' "$model"
 }
 
+inferencer_trim() {
+  local text="$1"
+  text="${text#"${text%%[![:space:]]*}"}"
+  text="${text%"${text##*[![:space:]]}"}"
+  printf '%s\n' "$text"
+}
+
+inferencer_strip_markdown_markers() {
+  local text="$1"
+  text="${text//\*\*/}"
+  text="${text//\*/}"
+  text="${text//_/}"
+  text="${text//\`/}"
+  printf '%s\n' "$text"
+}
+
+inferencer_repeat_char() {
+  local char="$1"
+  local count="$2"
+  local out=""
+
+  while (( ${#out} < count )); do
+    out+="$char"
+  done
+
+  printf '%s' "$out"
+}
+
+inferencer_render_inline_markdown() {
+  emulate -L zsh
+  setopt extendedglob
+
+  local line="$1"
+  local RESET=$'\033[0m'
+  local BOLD=$'\033[1m'
+  local ITALIC=$'\033[3m'
+  local REVERSE=$'\033[7m'
+
+  while [[ "$line" == *\`[^\`]##\`* ]]; do
+    line="${line/\`(#b)([^\`]##)\`/${REVERSE}${match[1]}${RESET}}"
+  done
+
+  while [[ "$line" == *\*\*[^*]##\*\** ]]; do
+    line="${line/\*\*(#b)([^*]##)\*\*/${BOLD}${match[1]}${RESET}}"
+  done
+
+  while [[ "$line" == *\*[^*]##\** ]]; do
+    line="${line/\*(#b)([^*]##)\*/${ITALIC}${match[1]}${RESET}}"
+  done
+
+  while [[ "$line" == *_[^_]##_* ]]; do
+    line="${line/_(#b)([^_]##)_/${ITALIC}${match[1]}${RESET}}"
+  done
+
+  print -r -- "$line"
+}
+
+inferencer_is_table_line() {
+  [[ "$1" =~ '^[[:space:]]*\|.*\|[[:space:]]*$' ]]
+}
+
+inferencer_is_table_separator() {
+  local line
+  local cell
+  local -a cells
+
+  line="$(inferencer_trim "$1")"
+  [[ "$line" == \|*\| ]] || return 1
+
+  line="${line#|}"
+  line="${line%|}"
+  local IFS='|'
+  read -rA cells <<< "$line"
+
+  for cell in "${cells[@]}"; do
+    cell="$(inferencer_trim "$cell")"
+    [[ "$cell" =~ '^:?-{3,}:?$' ]] || return 1
+  done
+
+  return 0
+}
+
+inferencer_render_table() {
+  emulate -L zsh
+  setopt extendedglob
+
+  local sep=$'\x1f'
+  local line trimmed row_text plain padded
+  local -a rows widths cells
+  local i cell_count row_index
+
+  cell_count=0
+
+  for line in "$@"; do
+    if inferencer_is_table_separator "$line"; then
+      continue
+    fi
+
+    trimmed="$(inferencer_trim "$line")"
+    trimmed="${trimmed#|}"
+    trimmed="${trimmed%|}"
+    local IFS='|'
+    read -rA cells <<< "$trimmed"
+    (( ${#cells} > cell_count )) && cell_count=${#cells}
+
+    for (( i = 1; i <= ${#cells}; i++ )); do
+      cells[$i]="$(inferencer_trim "${cells[$i]}")"
+      plain="$(inferencer_strip_markdown_markers "${cells[$i]}")"
+      if [[ -z "${widths[$i]:-}" ]] || (( ${#plain} > widths[$i] )); then
+        widths[$i]=${#plain}
+      fi
+    done
+
+    rows+=("${(j:$sep:)cells}")
+  done
+
+  (( ${#rows} > 0 )) || return 0
+
+  row_index=1
+  for line in "${rows[@]}"; do
+    cells=("${(@s:$sep:)line}")
+    row_text=""
+
+    for (( i = 1; i <= cell_count; i++ )); do
+      cell="${cells[$i]:-}"
+      plain="$(inferencer_strip_markdown_markers "$cell")"
+      padded="$cell$(inferencer_repeat_char ' ' $(( widths[$i] - ${#plain} )))"
+      row_text+="| $(inferencer_render_inline_markdown "$padded") "
+    done
+    row_text+="|"
+    print -r -- "$row_text"
+
+    if (( row_index == 1 && ${#rows} > 1 )); then
+      row_text=""
+      for (( i = 1; i <= cell_count; i++ )); do
+        row_text+="| $(inferencer_repeat_char '-' "${widths[$i]}") "
+      done
+      row_text+="|"
+      print -r -- "$row_text"
+    fi
+
+    (( row_index++ ))
+  done
+}
+
 inferencer_response_has_error() {
   local response="$1"
   printf '%s' "$response" | jq -e '.error' >/dev/null 2>&1
@@ -117,13 +262,13 @@ inferencer_check_openrouter_truncation() {
 }
 
 query_gemini() {
-  local prompt="$*"
-  inferencer_require_prompt "$prompt" 'Usage: query_gemini "your prompt"' || return 1
+  local prompt="$1"
+  inferencer_require_prompt "$prompt" 'Usage: query_gemini "your prompt" [model]' || return 1
   inferencer_require_command jq || return 1
   inferencer_require_command curl || return 1
 
   local api_key="${GEMINI_API_KEY:-}"
-  local model="${GEMINI_MODEL:-gemini-2.5-flash}"
+  local model="${2:-${GEMINI_MODEL:-gemini-2.5-flash}}"
   local temperature="${GEMINI_TEMPERATURE:-0.7}"
   local top_p="${GEMINI_TOP_P:-1}"
   local top_k="${GEMINI_TOP_K:-40}"
@@ -203,18 +348,18 @@ query_gemini() {
     return 1
   }
 
-  printf '%s\n' "$text"
+  printf '%s\n' "$text" | render_markdown_terminal
 }
 
 query_groq() {
-  local prompt="$*"
-  inferencer_require_prompt "$prompt" 'Usage: query_groq "your prompt"' || return 1
+  local prompt="$1"
+  inferencer_require_prompt "$prompt" 'Usage: query_groq "your prompt" [model]' || return 1
   inferencer_require_command jq || return 1
   inferencer_require_command curl || return 1
 
   local api_key="${GROQ_API_KEY:-}"
   local url="${GROQ_API_URL:-https://api.groq.com/openai/v1/chat/completions}"
-  local model="${GROQ_MODEL:-groq/compound}"
+  local model="${2:-${GROQ_MODEL:-groq/compound}}"
   local temperature="${GROQ_TEMPERATURE:-1.0}"
   local top_p="${GROQ_TOP_P:-1.0}"
   local max_tokens="${GROQ_MAX_TOKENS:-1024}"
@@ -263,18 +408,18 @@ query_groq() {
     return 1
   }
 
-  printf '%s\n' "$text"
+  printf '%s\n' "$text" | render_markdown_terminal
 }
 
 query_openrouter() {
-  local prompt="$*"
-  inferencer_require_prompt "$prompt" 'Usage: query_openrouter "your prompt"' || return 1
+  local prompt="$1"
+  inferencer_require_prompt "$prompt" 'Usage: query_openrouter "your prompt" [model]' || return 1
   inferencer_require_command jq || return 1
   inferencer_require_command curl || return 1
 
   local api_key="${OPENROUTER_API_KEY:-}"
   local url="${OPENROUTER_API_URL:-https://openrouter.ai/api/v1/chat/completions}"
-  local model="${OPENROUTER_MODEL:-openrouter/free}"
+  local model="${2:-${OPENROUTER_MODEL:-openrouter/free}}"
   local temperature="${OPENROUTER_TEMPERATURE:-0}"
   local top_p="${OPENROUTER_TOP_P:-1}"
   local max_tokens="${OPENROUTER_MAX_TOKENS:-2048}"
@@ -332,18 +477,18 @@ query_openrouter() {
     return 1
   }
 
-  printf '%s\n' "$text"
+  printf '%s\n' "$text" | render_markdown_terminal
 }
 
 query_cerebras() {
-  local prompt="$*"
-  inferencer_require_prompt "$prompt" 'Usage: query_cerebras "your prompt"' || return 1
+  local prompt="$1"
+  inferencer_require_prompt "$prompt" 'Usage: query_cerebras "your prompt" [model]' || return 1
   inferencer_require_command jq || return 1
   inferencer_require_command curl || return 1
 
   local api_key="${CEREBRAS_API_KEY:-}"
   local url="${CEREBRAS_API_URL:-https://api.cerebras.ai/v1/chat/completions}"
-  local model="${CEREBRAS_MODEL:-llama3.1-8b}"
+  local model="${2:-${CEREBRAS_MODEL:-llama3.1-8b}}"
   local temperature="${CEREBRAS_TEMPERATURE:-0}"
   local top_p="${CEREBRAS_TOP_P:-1}"
   local max_tokens="${CEREBRAS_MAX_TOKENS:--1}"
@@ -398,18 +543,18 @@ query_cerebras() {
     return 1
   }
 
-  printf '%s\n' "$text"
+  printf '%s\n' "$text" | render_markdown_terminal
 }
 
 query_ollama() {
-  local prompt="$*"
-  inferencer_require_prompt "$prompt" 'Usage: query_ollama "your prompt"' || return 1
+  local prompt="$1"
+  inferencer_require_prompt "$prompt" 'Usage: query_ollama "your prompt" [model]' || return 1
   inferencer_require_command jq || return 1
   inferencer_require_command curl || return 1
 
   local api_key="${OLLAMA_API_KEY:-}"
   local url="${OLLAMA_API_URL:-https://ollama.com/api/chat}"
-  local model="${OLLAMA_MODEL:-gpt-oss:120b}"
+  local model="${2:-${OLLAMA_MODEL:-gpt-oss:120b}}"
   local body response text
 
   inferencer_require_api_key "$api_key" "OLLAMA_API_KEY" || return 1
@@ -448,11 +593,11 @@ query_ollama() {
     return 1
   }
 
-  printf '%s\n' "$text"
+  printf '%s\n' "$text" | render_markdown_terminal
 }
 
 query_fallback() {
-  local prompt="$*"
+  local prompt="$1"
   local output
   local err_file
 
@@ -461,7 +606,7 @@ query_fallback() {
   err_file="$(mktemp "${TMPDIR:-/tmp}/inferencer-fallback.XXXXXX")" || return 1
 
   output="$(
-    GEMINI_MODEL="models/gemini-flash-latest" query_gemini "$prompt" 2>"$err_file"
+    query_gemini "$prompt" 2>"$err_file"
   )"
   if [[ $? -eq 0 ]]; then
     rm -f "$err_file"
@@ -472,7 +617,7 @@ query_fallback() {
   cat "$err_file" >&2
 
   output="$(
-    OPENROUTER_MODEL="openrouter/free" OPENROUTER_REASONING="false" query_openrouter "$prompt" 2>"$err_file"
+    query_openrouter "$prompt" 2>"$err_file"
   )"
   if [[ $? -eq 0 ]]; then
     rm -f "$err_file"
@@ -483,7 +628,7 @@ query_fallback() {
   cat "$err_file" >&2
 
   output="$(
-    GROQ_MODEL="groq/compound" query_groq "$prompt" 2>"$err_file"
+    query_groq "$prompt" 2>"$err_file"
   )"
   if [[ $? -eq 0 ]]; then
     rm -f "$err_file"
@@ -502,19 +647,28 @@ render_markdown_terminal() {
   emulate -L zsh
   setopt extendedglob
 
-  local line text hashes level
+  local line text hashes level bullet_indent bullet_text
+  local -a table_lines
   local hr
   hr=$(printf '%*s' 50 '')
   hr=${hr// /─}
 
   local RESET=$'\033[0m'
   local BOLD=$'\033[1m'
-  local ITALIC=$'\033[3m'
   local UNDERLINE=$'\033[4m'
   local CYAN=$'\033[36m'
-  local REVERSE=$'\033[7m'
 
   while IFS= read -r line || [[ -n "$line" ]]; do
+    if inferencer_is_table_line "$line"; then
+      table_lines+=("$line")
+      continue
+    fi
+
+    if (( ${#table_lines} > 0 )); then
+      inferencer_render_table "${table_lines[@]}"
+      table_lines=()
+    fi
+
     case "$line" in
       ([[:space:]]#'---'[[:space:]]#|[[:space:]]#'***'[[:space:]]#|[[:space:]]#'___'[[:space:]]#)
         print -r -- "$hr"
@@ -525,7 +679,7 @@ render_markdown_terminal() {
     if [[ "$line" =~ '^#{1,}[[:space:]]' ]]; then
       hashes="${line%% *}"
       level=${#hashes}
-      text="${line#"$hashes "}"
+      text="$(inferencer_render_inline_markdown "${line#"$hashes "}")"
 
       case $level in
         1) print -r -- "${BOLD}${(U)text}${RESET}" ;;
@@ -536,22 +690,17 @@ render_markdown_terminal() {
       continue
     fi
 
-    while [[ "$line" == *\`[^\`]##\`* ]]; do
-      line="${line/\`(#b)([^\`]##)\`/${REVERSE}${match[1]}${RESET}}"
-    done
+    if [[ "$line" =~ '^([[:space:]]*)\*[[:space:]]+(.*)$' ]]; then
+      bullet_indent="${match[1]}"
+      bullet_text="$(inferencer_render_inline_markdown "${match[2]}")"
+      print -r -- "${bullet_indent}• ${bullet_text}"
+      continue
+    fi
 
-    while [[ "$line" == *\*\*[^*]##\*\** ]]; do
-      line="${line/\*\*(#b)([^*]##)\*\*/${BOLD}${match[1]}${RESET}}"
-    done
-
-    while [[ "$line" == *\*[^*]##\** ]]; do
-      line="${line/\*(#b)([^*]##)\*/${ITALIC}${match[1]}${RESET}}"
-    done
-
-    while [[ "$line" == *_[^_]##_* ]]; do
-      line="${line/_(#b)([^_]##)_/${ITALIC}${match[1]}${RESET}}"
-    done
-
-    print -r -- "$line"
+    print -r -- "$(inferencer_render_inline_markdown "$line")"
   done
+
+  if (( ${#table_lines} > 0 )); then
+    inferencer_render_table "${table_lines[@]}"
+  fi
 }

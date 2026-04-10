@@ -94,17 +94,24 @@ Example shell usage:
 
 ```sh
 query_openrouter "Summarize the main uses of retrieval-augmented generation."
-query_gemini "Write three title ideas for a data engineering memo."
-query_ollama "Explain principal component analysis in one paragraph."
+query_gemini "Write three title ideas for a data engineering memo." "gemini-2.5-flash"
+query_ollama "Explain principal component analysis in one paragraph." "gpt-oss:120b"
 query_fallback "Draft a concise status update for today's analysis."
-query_openrouter "Write release notes in markdown." | render_markdown_terminal
 ```
 
-`query_fallback` uses this fixed order:
+Each `query_*` shell helper now takes:
 
-1. `query_gemini` with `GEMINI_MODEL=models/gemini-flash-latest`
-2. `query_openrouter` with `OPENROUTER_MODEL=openrouter/free`
-3. `query_groq` with `GROQ_MODEL=groq/compound`
+1. prompt as the first argument
+2. optional model as the second argument
+
+Successful `query_*` calls automatically render markdown for terminal output,
+including headings, bullet points, horizontal rules, and pipe tables.
+
+`query_fallback` uses this fixed order with each function's default model:
+
+1. `query_gemini`
+2. `query_openrouter`
+3. `query_groq`
 
 If all three calls fail, it exits with a non-zero status.
 

@@ -18,11 +18,13 @@ aligned with the R wrappers, such as \code{GEMINI_API_KEY}, \code{GROQ_API_KEY},
 \code{OPENROUTER_API_KEY}, \code{CEREBRAS_API_KEY}, and \code{OLLAMA_API_KEY}.
 
 They are intentionally minimal and depend on external \code{curl} and \code{jq}
-binaries. The bundled markdown renderer uses zsh-specific pattern matching.
-\code{query_fallback()} tries Gemini first with \code{models/gemini-flash-latest},
-then OpenRouter with \code{openrouter/free}, then Groq with \code{groq/compound}.
-It prints provider-specific stderr before moving to the next fallback and
-disables OpenRouter reasoning mode during that fallback step.
+binaries. Query helpers take the prompt as the first argument and an
+optional model override as the second argument, while keeping the same
+default models as before. Successful query helpers automatically pass the
+returned text through \code{render_markdown_terminal()}.
+\code{query_fallback()} tries \code{query_gemini()}, then \code{query_openrouter()}, then
+\code{query_groq()} using each function's default model.
+It prints provider-specific stderr before moving to the next fallback.
 The Gemini shell wrapper accepts model names either with or without the
 leading \verb{models/} prefix.
 }

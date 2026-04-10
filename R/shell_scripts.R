@@ -13,11 +13,13 @@
 #' `OPENROUTER_API_KEY`, `CEREBRAS_API_KEY`, and `OLLAMA_API_KEY`.
 #'
 #' They are intentionally minimal and depend on external `curl` and `jq`
-#' binaries. The bundled markdown renderer uses zsh-specific pattern matching.
-#' `query_fallback()` tries Gemini first with `models/gemini-flash-latest`,
-#' then OpenRouter with `openrouter/free`, then Groq with `groq/compound`.
-#' It prints provider-specific stderr before moving to the next fallback and
-#' disables OpenRouter reasoning mode during that fallback step.
+#' binaries. Query helpers take the prompt as the first argument and an
+#' optional model override as the second argument, while keeping the same
+#' default models as before. Successful query helpers automatically pass the
+#' returned text through `render_markdown_terminal()`.
+#' `query_fallback()` tries `query_gemini()`, then `query_openrouter()`, then
+#' `query_groq()` using each function's default model.
+#' It prints provider-specific stderr before moving to the next fallback.
 #' The Gemini shell wrapper accepts model names either with or without the
 #' leading `models/` prefix.
 #'
