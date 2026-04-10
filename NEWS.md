@@ -1,3 +1,10 @@
+# inferencer 0.1.4
+
+- Added a zsh-oriented shell companion under `inst/shell/inferencer.sh`.
+- Added shell wrappers for Gemini, Groq, OpenRouter, Cerebras, and Ollama Cloud.
+- Added `query_fallback()` for ordered shell failover across Gemini, OpenRouter, and Groq.
+- Added shell documentation and README examples for sourcing and using the shipped scripts.
+
 # inferencer 0.1.3.2
 
 - Added Ollama Cloud model listing and chat-query wrappers.

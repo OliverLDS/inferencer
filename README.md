@@ -1,7 +1,9 @@
 # inferencer
 
 `inferencer` is a lightweight R package for calling hosted foundation model
-inference APIs through a simple and mostly consistent interface.
+inference APIs through a simple and mostly consistent interface. It also ships
+with a small shell companion for the same providers when you want terminal
+usage without writing R code.
 
 It currently supports:
 
@@ -42,6 +44,69 @@ Load the package:
 ```r
 library(inferencer)
 ```
+
+## Shell scripts
+
+The package includes shell helpers in `inst/shell/inferencer.sh`. They are
+kept inside `inferencer` because they mirror the R wrappers closely and stay
+small enough not to justify a separate package. This shell layer is intended
+for `zsh`, which matches the `.zprofile` setup and the bundled markdown
+renderer.
+
+The shell layer currently includes:
+
+- `query_gemini`
+- `query_groq`
+- `query_openrouter`
+- `query_cerebras`
+- `query_ollama`
+- `query_fallback`
+- `render_markdown_terminal`
+
+Source the script from the repo:
+
+```sh
+source inst/shell/inferencer.sh
+```
+
+Or from an installed package:
+
+```r
+system.file("shell", "inferencer.sh", package = "inferencer")
+```
+
+```sh
+source "$(Rscript -e 'cat(system.file(\"shell\", \"inferencer.sh\", package = \"inferencer\"))')"
+```
+
+Shell API keys should live in `.zprofile`, not `.Renviron`, but they use the
+same names as the R wrappers:
+
+```sh
+export GEMINI_API_KEY="your_key_here"
+export GROQ_API_KEY="your_key_here"
+export OPENROUTER_API_KEY="your_key_here"
+export CEREBRAS_API_KEY="your_key_here"
+export OLLAMA_API_KEY="your_key_here"
+```
+
+Example shell usage:
+
+```sh
+query_openrouter "Summarize the main uses of retrieval-augmented generation."
+query_gemini "Write three title ideas for a data engineering memo."
+query_ollama "Explain principal component analysis in one paragraph."
+query_fallback "Draft a concise status update for today's analysis."
+query_openrouter "Write release notes in markdown." | render_markdown_terminal
+```
+
+`query_fallback` uses this fixed order:
+
+1. `query_gemini` with `GEMINI_MODEL=models/gemini-flash-latest`
+2. `query_openrouter` with `OPENROUTER_MODEL=openrouter/free`
+3. `query_groq` with `GROQ_MODEL=groq/compound`
+
+If all three calls fail, it exits with a non-zero status.
 
 ## List available models
 
