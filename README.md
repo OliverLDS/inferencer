@@ -23,7 +23,8 @@ The package is intentionally minimal. It focuses on a few common tasks:
 It also includes Gemini TTS support through `query_gemini()` plus
 `write_gemini_audio()`, OpenRouter and Gemini embedding helpers, Gemini and
 OpenRouter image-generation helpers, and lower-level multimodal wrappers for
-non-text inputs.
+non-text inputs. It also includes `query_fallback()` on the R side for simple
+ordered fallback across Gemini, OpenRouter, and Groq.
 
 More advanced provider-specific parameters may be added gradually in future versions.
 
@@ -264,6 +265,12 @@ query_openrouter(
   model = "stepfun/step-3.5-flash:free",
   temperature = 0
 )
+```
+
+### Fallback
+
+```r
+query_fallback("Explain retrieval-augmented generation in plain English.")
 ```
 
 OpenRouter embeddings:

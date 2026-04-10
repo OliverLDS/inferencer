@@ -387,6 +387,62 @@ test_that("query_openrouter_content accepts multimodal content blocks", {
   )
 })
 
+test_that("query_fallback returns the first successful provider response", {
+  testthat::local_mocked_bindings(
+    query_gemini = function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"), json_list = FALSE, ...) {
+      stop("Gemini down", call. = FALSE)
+    },
+    query_openrouter = function(prompt, api_key = Sys.getenv("OPENROUTER_API_KEY"), json_list = FALSE, ...) {
+      if (json_list) {
+        return(list(text = "OpenRouter reply"))
+      }
+      "OpenRouter reply"
+    },
+    query_groq = function(prompt, api_key = Sys.getenv("GROQ_API_KEY"), json_list = FALSE, ...) {
+      stop("Groq should not be called", call. = FALSE)
+    },
+    .package = "inferencer"
+  )
+
+  expect_equal(query_fallback("hello"), "OpenRouter reply")
+
+  json <- query_fallback("hello", json_list = TRUE)
+  expect_equal(json$provider, "openrouter")
+  expect_equal(json$response$text, "OpenRouter reply")
+})
+
+test_that("query_fallback reports all provider failures", {
+  testthat::local_mocked_bindings(
+    query_gemini = function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"), json_list = FALSE, ...) {
+      stop("Gemini down", call. = FALSE)
+    },
+    query_openrouter = function(prompt, api_key = Sys.getenv("OPENROUTER_API_KEY"), json_list = FALSE, ...) {
+      stop("OpenRouter down", call. = FALSE)
+    },
+    query_groq = function(prompt, api_key = Sys.getenv("GROQ_API_KEY"), json_list = FALSE, ...) {
+      stop("Groq down", call. = FALSE)
+    },
+    .package = "inferencer"
+  )
+
+  expect_error(
+    query_fallback("hello"),
+    "All fallback providers failed"
+  )
+  expect_error(
+    query_fallback("hello"),
+    "gemini: Gemini down"
+  )
+  expect_error(
+    query_fallback("hello"),
+    "openrouter: OpenRouter down"
+  )
+  expect_error(
+    query_fallback("hello"),
+    "groq: Groq down"
+  )
+})
+
 test_that("query_openrouter_content parses text blocks and catches truncation", {
   testthat::local_mocked_bindings(
     request = function(url) structure(list(url = url), class = "request"),

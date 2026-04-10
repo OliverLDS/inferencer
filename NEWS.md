@@ -1,3 +1,8 @@
+# inferencer 0.1.4.2
+
+- Added an R-side `query_fallback()` wrapper with ordered fallback across Gemini, OpenRouter, and Groq.
+- Added tests and documentation for the new R fallback helper.
+
 # inferencer 0.1.4.1
 
 - Improved the shipped shell markdown renderer for headings, bullets, horizontal rules, and pipe tables.
