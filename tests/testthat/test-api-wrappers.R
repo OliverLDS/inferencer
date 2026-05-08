@@ -303,6 +303,131 @@ test_that("list_openrouter_models returns a data table or json list", {
   expect_equal(json$data[[1]]$name, "Model A")
 })
 
+test_that("list_openrouter_video_models returns a data table or json list", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = paste0(
+            '{"data":[{"id":"google/veo-3.1","name":"Veo 3.1",',
+            '"supported_resolutions":["720p"],',
+            '"supported_durations":[5,8],',
+            '"supported_aspect_ratios":["16:9"],',
+            '"pricing_skus":{"generate":"0.50"}}]}'
+          )
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  models <- list_openrouter_video_models(api_key = "key")
+  expect_s3_class(models, "data.table")
+  expect_equal(models$id[[1]], "google/veo-3.1")
+  expect_equal(unlist(models$supported_resolutions[[1]], use.names = FALSE), "720p")
+
+  json <- list_openrouter_video_models(api_key = "key", json_list = TRUE)
+  expect_equal(json$data[[1]]$pricing_skus$generate, "0.50")
+})
+
+test_that("extract_openrouter_benchmarks flattens benchmark metadata", {
+  models <- list(
+    data = list(
+      list(
+        id = "openai/gpt-4",
+        name = "GPT-4",
+        artificial_analysis = list(
+          coding = 64.2,
+          math = 71.5,
+          long_context = list(`100k` = 58.1, `1m` = 42.7)
+        )
+      ),
+      list(
+        id = "google/gemini-2.5-pro",
+        name = "Gemini 2.5 Pro",
+        benchmark_scores = list(science = 68.4)
+      )
+    )
+  )
+
+  benchmarks <- extract_openrouter_benchmarks(models)
+  expect_s3_class(benchmarks, "data.table")
+  expect_true(nrow(benchmarks) >= 5)
+  expect_true(any(benchmarks$model_id == "openai/gpt-4"))
+  expect_true(any(benchmarks$metric == "coding"))
+  expect_true(any(benchmarks$metric == "long_context.100k"))
+  expect_true(any(benchmarks$benchmark_field == "benchmark_scores"))
+})
+
+test_that("OpenRouter category model wrappers filter from model metadata", {
+  mock_models <- list(
+    data = list(
+      list(
+        id = "embed-a",
+        name = "Embed A",
+        architecture = list(
+          input_modalities = list("text"),
+          output_modalities = list("embeddings")
+        )
+      ),
+      list(
+        id = "image-a",
+        name = "Image A",
+        architecture = list(
+          input_modalities = list("text"),
+          output_modalities = list("image")
+        )
+      ),
+      list(
+        id = "audio-a",
+        name = "Audio A",
+        architecture = list(
+          input_modalities = list("audio", "text"),
+          output_modalities = list("text")
+        )
+      ),
+      list(
+        id = "multi-a",
+        name = "Multi A",
+        architecture = list(
+          input_modalities = list("text", "image"),
+          output_modalities = list("text")
+        )
+      )
+    )
+  )
+
+  testthat::local_mocked_bindings(
+    list_openrouter_models = function(api_key = Sys.getenv("OPENROUTER_API_KEY"), url = "https://openrouter.ai/api/v1/models", json_list = FALSE) {
+      if (json_list) {
+        return(mock_models)
+      }
+
+      .openrouter_model_rows(mock_models$data)
+    },
+    .package = "inferencer"
+  )
+
+  embed_dt <- list_openrouter_embedding_models(api_key = "key")
+  expect_equal(embed_dt$id, "embed-a")
+
+  image_json <- list_openrouter_image_models(api_key = "key", json_list = TRUE)
+  expect_equal(image_json$data[[1]]$id, "image-a")
+
+  audio_dt <- list_openrouter_audio_models(api_key = "key")
+  expect_equal(audio_dt$id, "audio-a")
+
+  multi_dt <- list_openrouter_multimodal_models(api_key = "key")
+  expect_equal(multi_dt$id, c("audio-a", "multi-a"))
+})
+
 test_that("query_openrouter returns text, json, and API errors", {
   testthat::local_mocked_bindings(
     request = function(url) structure(list(url = url), class = "request"),

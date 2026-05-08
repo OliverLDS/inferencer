@@ -336,3 +336,181 @@
 
   data.table::rbindlist(rows, fill = TRUE)
 }
+
+.openrouter_video_model_rows <- function(models) {
+  rows <- lapply(models, function(x) {
+    for (nm in c(
+      "allowed_passthrough_parameters",
+      "supported_aspect_ratios",
+      "supported_durations",
+      "supported_frame_images",
+      "supported_reference_images",
+      "supported_resolutions",
+      "supported_sizes"
+    )) {
+      if (nm %in% names(x)) {
+        x[[nm]] <- list(x[[nm]])
+      }
+    }
+
+    if ("pricing_skus" %in% names(x)) {
+      x$pricing_skus <- list(x$pricing_skus)
+    }
+
+    for (nm in names(x)) {
+      if (length(x[[nm]]) == 0) {
+        x[[nm]] <- NA
+      }
+    }
+
+    x
+  })
+
+  data.table::rbindlist(rows, fill = TRUE)
+}
+
+.coerce_openrouter_models_input <- function(models) {
+  if (is.list(models) && !is.data.frame(models) && !is.null(models$data) && is.list(models$data)) {
+    return(models$data)
+  }
+
+  if (is.data.frame(models)) {
+    out <- vector("list", nrow(models))
+    for (i in seq_len(nrow(models))) {
+      out[[i]] <- as.list(models[i, , drop = FALSE])
+    }
+    return(out)
+  }
+
+  if (is.list(models) && length(models) >= 1) {
+    return(models)
+  }
+
+  stop("`models` must be a parsed OpenRouter models response, list of model objects, or data.frame.", call. = FALSE)
+}
+
+.flatten_benchmark_payload <- function(x, prefix = NULL) {
+  out <- list()
+
+  if (is.null(x) || length(x) == 0) {
+    return(out)
+  }
+
+  if (!is.list(x)) {
+    key <- if (is.null(prefix)) "value" else prefix
+    out[[key]] <- as.character(x[[1]])
+    return(out)
+  }
+
+  nms <- names(x)
+  if (is.null(nms)) {
+    nms <- rep("", length(x))
+  }
+
+  for (i in seq_along(x)) {
+    name_i <- nms[[i]]
+    next_prefix <- prefix
+
+    if (nzchar(name_i)) {
+      next_prefix <- if (is.null(prefix)) name_i else paste(prefix, name_i, sep = ".")
+    } else if (length(x) > 1) {
+      next_prefix <- if (is.null(prefix)) as.character(i) else paste(prefix, i, sep = ".")
+    }
+
+    flattened <- .flatten_benchmark_payload(x[[i]], next_prefix)
+    if (length(flattened) > 0) {
+      out <- c(out, flattened)
+    }
+  }
+
+  out
+}
+
+.openrouter_extract_architecture_field <- function(x, field) {
+  if (is.data.frame(x)) {
+    if (!"architecture" %in% names(x)) {
+      return(rep(list(NULL), nrow(x)))
+    }
+
+    return(lapply(x$architecture, function(arch) {
+      if (is.list(arch) && !is.null(arch[[field]])) arch[[field]] else NULL
+    }))
+  }
+
+  if (is.list(x) && !is.null(x$data) && is.list(x$data)) {
+    return(lapply(x$data, function(model) {
+      if (is.list(model$architecture) && !is.null(model$architecture[[field]])) model$architecture[[field]] else NULL
+    }))
+  }
+
+  if (is.list(x)) {
+    return(lapply(x, function(model) {
+      if (is.list(model$architecture) && !is.null(model$architecture[[field]])) model$architecture[[field]] else NULL
+    }))
+  }
+
+  stop("Unsupported OpenRouter model container.", call. = FALSE)
+}
+
+.normalize_modality_values <- function(x) {
+  if (is.null(x) || length(x) == 0) {
+    return(character(0))
+  }
+
+  vals <- unlist(x, use.names = FALSE)
+  vals <- vals[!is.na(vals)]
+  tolower(as.character(vals))
+}
+
+.openrouter_models_keep <- function(models, keep) {
+  if (is.data.frame(models)) {
+    return(models[keep, , drop = FALSE])
+  }
+
+  if (is.list(models) && !is.null(models$data) && is.list(models$data)) {
+    out <- models
+    out$data <- models$data[keep]
+    return(out)
+  }
+
+  if (is.list(models)) {
+    return(models[keep])
+  }
+
+  stop("Unsupported OpenRouter model container.", call. = FALSE)
+}
+
+.filter_openrouter_models_by_modalities <- function(models,
+  input_modalities = NULL,
+  output_modalities = NULL,
+  require_multiple_inputs = FALSE) {
+
+  inputs <- .openrouter_extract_architecture_field(models, "input_modalities")
+  outputs <- .openrouter_extract_architecture_field(models, "output_modalities")
+
+  keep <- rep(TRUE, length(inputs))
+
+  if (!is.null(input_modalities)) {
+    wanted <- tolower(input_modalities)
+    keep <- keep & vapply(inputs, function(x) {
+      vals <- .normalize_modality_values(x)
+      any(wanted %in% vals)
+    }, logical(1))
+  }
+
+  if (!is.null(output_modalities)) {
+    wanted <- tolower(output_modalities)
+    keep <- keep & vapply(outputs, function(x) {
+      vals <- .normalize_modality_values(x)
+      any(wanted %in% vals)
+    }, logical(1))
+  }
+
+  if (require_multiple_inputs) {
+    keep <- keep & vapply(inputs, function(x) {
+      length(.normalize_modality_values(x)) > 1
+    }, logical(1))
+  }
+
+  .openrouter_models_keep(models, keep)
+}

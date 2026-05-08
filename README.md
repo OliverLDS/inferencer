@@ -151,6 +151,29 @@ Parsed JSON list:
 openrouter_json <- list_openrouter_models(json_list = TRUE)
 ```
 
+Extract benchmark fields if OpenRouter includes them in model metadata:
+
+```r
+or_benchmarks <- extract_openrouter_benchmarks(openrouter_json)
+head(or_benchmarks)
+```
+
+Filter model categories from the general catalog:
+
+```r
+openrouter_embedding_models <- list_openrouter_embedding_models()
+openrouter_image_models <- list_openrouter_image_models()
+openrouter_audio_models <- list_openrouter_audio_models()
+openrouter_multimodal_models <- list_openrouter_multimodal_models()
+```
+
+List video generation models and their supported capabilities:
+
+```r
+openrouter_video_models <- list_openrouter_video_models()
+head(openrouter_video_models)
+```
+
 ### Ollama Cloud
 
 ```r

@@ -1,3 +1,9 @@
+# inferencer 0.1.4.3
+
+- Added OpenRouter video-model discovery via `list_openrouter_video_models()`.
+- Added benchmark extraction support via `extract_openrouter_benchmarks()`.
+- Added category-specific OpenRouter model wrappers for embeddings, image, audio, and multimodal models.
+
 # inferencer 0.1.4.2
 
 - Added an R-side `query_fallback()` wrapper with ordered fallback across Gemini, OpenRouter, and Groq.
