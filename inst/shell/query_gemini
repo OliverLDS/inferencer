@@ -1,0 +1,85 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+script_dir="${0:A:h}"
+source "${script_dir}/lib/common.zsh"
+source "${script_dir}/lib/json.zsh"
+
+usage='Usage: query_gemini [--json] "prompt" [model]'
+inferencer_parse_query_args "$usage" "$@" || exit $?
+inferencer_require_command jq
+inferencer_require_command curl
+
+api_key="${GEMINI_API_KEY:-}"
+model="${INFERENCER_MODEL:-${GEMINI_MODEL:-gemini-2.5-flash}}"
+temperature="${GEMINI_TEMPERATURE:-0.7}"
+top_p="${GEMINI_TOP_P:-1}"
+top_k="${GEMINI_TOP_K:-40}"
+max_tokens="${GEMINI_MAX_TOKENS:-}"
+url0="${GEMINI_API_URL:-https://generativelanguage.googleapis.com/v1beta/models}"
+
+inferencer_require_api_key "$api_key" "GEMINI_API_KEY"
+model_path="$(inferencer_normalize_gemini_model "$model")"
+url="${url0}/${model_path}:generateContent?key=${api_key}"
+
+if [[ -n "$max_tokens" ]]; then
+  body="$(
+    jq -n \
+      --arg prompt "$INFERENCER_PROMPT" \
+      --argjson temperature "$temperature" \
+      --argjson top_p "$top_p" \
+      --argjson top_k "$top_k" \
+      --argjson max_tokens "$max_tokens" \
+      '{
+        contents: [{ role: "user", parts: [{ text: $prompt }] }],
+        generationConfig: {
+          temperature: $temperature,
+          topP: $top_p,
+          topK: $top_k,
+          maxOutputTokens: $max_tokens
+        }
+      }'
+  )"
+else
+  body="$(
+    jq -n \
+      --arg prompt "$INFERENCER_PROMPT" \
+      --argjson temperature "$temperature" \
+      --argjson top_p "$top_p" \
+      --argjson top_k "$top_k" \
+      '{
+        contents: [{ role: "user", parts: [{ text: $prompt }] }],
+        generationConfig: {
+          temperature: $temperature,
+          topP: $top_p,
+          topK: $top_k
+        }
+      }'
+  )"
+fi
+
+response="$(
+  curl --silent --show-error --fail \
+    -H "Content-Type: application/json" \
+    --data "$body" \
+    "$url"
+)"
+
+if inferencer_response_has_error "$response"; then
+  inferencer_print_error_response "$response"
+  exit 1
+fi
+
+if [[ "$INFERENCER_JSON" == true ]]; then
+  printf '%s\n' "$response" | jq .
+  exit 0
+fi
+
+text="$(inferencer_extract_gemini_text "$response")"
+[[ -n "$text" ]] || {
+  print -r -- "Error: Gemini API returned no text content." >&2
+  inferencer_print_error_response "$response"
+  exit 1
+}
+
+printf '%s\n' "$text"

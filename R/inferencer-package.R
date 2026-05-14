@@ -5,8 +5,8 @@
 #' OpenRouter, Cerebras, and Ollama Cloud. In addition to prompt-based text
 #' generation, it includes wrappers for embeddings, image generation, and
 #' multimodal non-text inputs where supported by the provider APIs. The package
-#' also ships a small shell companion under `inst/shell/inferencer.sh` for
-#' terminal-based API calls that mirror the R wrappers.
+#' also ships small executable shell companions under `inst/shell` for
+#' terminal-based API calls that mirror common R wrapper workflows.
 #'
 #' @keywords internal
 "_PACKAGE"

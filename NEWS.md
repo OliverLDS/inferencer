@@ -1,3 +1,10 @@
+# inferencer 0.1.4.4
+
+- Split the optional zsh shell layer into small executable scripts under `inst/shell`.
+- Added shared shell helper modules under `inst/shell/lib`.
+- Added shell model-listing scripts and `--json` support for query and listing commands.
+- Removed the monolithic `inst/shell/inferencer.sh` sourced-function bundle.
+
 # inferencer 0.1.4.3
 
 - Added OpenRouter video-model discovery via `list_openrouter_video_models()`.

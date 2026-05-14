@@ -1,0 +1,72 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+script_dir="${0:A:h}"
+source "${script_dir}/lib/common.zsh"
+source "${script_dir}/lib/json.zsh"
+
+usage='Usage: query_openrouter [--json] "prompt" [model]'
+inferencer_parse_query_args "$usage" "$@" || exit $?
+inferencer_require_command jq
+inferencer_require_command curl
+
+api_key="${OPENROUTER_API_KEY:-}"
+url="${OPENROUTER_API_URL:-https://openrouter.ai/api/v1/chat/completions}"
+model="${INFERENCER_MODEL:-${OPENROUTER_MODEL:-openrouter/free}}"
+temperature="${OPENROUTER_TEMPERATURE:-0}"
+top_p="${OPENROUTER_TOP_P:-1}"
+max_tokens="${OPENROUTER_MAX_TOKENS:-2048}"
+reasoning="${OPENROUTER_REASONING:-true}"
+
+inferencer_require_api_key "$api_key" "OPENROUTER_API_KEY"
+inferencer_require_bool "$reasoning" "OPENROUTER_REASONING"
+
+body="$(
+  jq -n \
+    --arg prompt "$INFERENCER_PROMPT" \
+    --arg model "$model" \
+    --argjson temperature "$temperature" \
+    --argjson top_p "$top_p" \
+    --argjson max_tokens "$max_tokens" \
+    --argjson reasoning "$reasoning" \
+    '{
+      model: $model,
+      messages: [{ role: "user", content: $prompt }],
+      temperature: $temperature,
+      top_p: $top_p,
+      max_tokens: $max_tokens,
+      reasoning: { enabled: $reasoning }
+    }'
+)"
+
+response="$(
+  curl --silent --show-error --fail \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $api_key" \
+    --data "$body" \
+    "$url"
+)"
+
+if inferencer_response_has_error "$response"; then
+  inferencer_print_error_response "$response"
+  exit 1
+fi
+
+inferencer_check_openrouter_truncation "$response" || {
+  inferencer_print_error_response "$response"
+  exit 1
+}
+
+if [[ "$INFERENCER_JSON" == true ]]; then
+  printf '%s\n' "$response" | jq .
+  exit 0
+fi
+
+text="$(inferencer_extract_openai_text "$response")"
+[[ -n "$text" ]] || {
+  print -r -- "Error: OpenRouter API returned no message content." >&2
+  inferencer_print_error_response "$response"
+  exit 1
+}
+
+printf '%s\n' "$text"

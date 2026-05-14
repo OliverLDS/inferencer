@@ -1,0 +1,33 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+script_dir="${0:A:h}"
+source "${script_dir}/lib/common.zsh"
+source "${script_dir}/lib/json.zsh"
+
+usage='Usage: list_groq_models [--json]'
+inferencer_parse_list_args "$usage" "$@" || exit $?
+inferencer_require_command jq
+inferencer_require_command curl
+
+api_key="${GROQ_API_KEY:-}"
+url="${GROQ_MODELS_URL:-https://api.groq.com/openai/v1/models}"
+inferencer_require_api_key "$api_key" "GROQ_API_KEY"
+
+response="$(
+  curl --silent --show-error --fail \
+    -H "Authorization: Bearer $api_key" \
+    -H "Content-Type: application/json" \
+    "$url"
+)"
+
+if inferencer_response_has_error "$response"; then
+  inferencer_print_error_response "$response"
+  exit 1
+fi
+
+if [[ "$INFERENCER_JSON" == true ]]; then
+  printf '%s\n' "$response" | jq .
+else
+  printf '%s\n' "$response" | inferencer_format_table
+fi

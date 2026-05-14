@@ -1,0 +1,25 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+script_dir="${0:A:h}"
+source "${script_dir}/lib/common.zsh"
+
+usage='Usage: list_openrouter_free_models [--json]'
+inferencer_parse_list_args "$usage" "$@" || exit $?
+inferencer_require_command jq
+
+response="$("${script_dir}/list_openrouter_models" --json)"
+filtered="$(
+  printf '%s\n' "$response" | jq '
+    .data = [
+      .data[]
+      | select((.pricing.prompt // "0" | tonumber) == 0)
+    ]
+  '
+)"
+
+if [[ "$INFERENCER_JSON" == true ]]; then
+  printf '%s\n' "$filtered" | jq .
+else
+  printf '%s\n' "$filtered" | inferencer_format_table
+fi

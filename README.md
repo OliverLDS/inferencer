@@ -48,36 +48,31 @@ library(inferencer)
 
 ## Shell scripts
 
-The package includes shell helpers in `inst/shell/inferencer.sh`. They are
-kept inside `inferencer` because they mirror the R wrappers closely and stay
-small enough not to justify a separate package. This shell layer is intended
-for `zsh`, which matches the `.zprofile` setup and the bundled markdown
-renderer.
+The package includes optional executable `zsh` helpers in `inst/shell`. They
+are kept inside `inferencer` because they mirror the R wrappers closely and
+stay small enough not to justify a separate package.
 
-The shell layer currently includes:
+The shell layer currently includes query helpers, model-listing helpers, and a
+terminal markdown renderer:
 
-- `query_gemini`
-- `query_groq`
-- `query_openrouter`
-- `query_cerebras`
-- `query_ollama`
-- `query_fallback`
+- `query_gemini`, `query_groq`, `query_openrouter`, `query_ollama`, `query_fallback`
+- `list_gemini_models`, `list_groq_models`, `list_openrouter_models`, `list_openrouter_free_models`, `list_ollama_models`
 - `render_markdown_terminal`
 
-Source the script from the repo:
+Run scripts from the repo:
 
 ```sh
-source inst/shell/inferencer.sh
+inst/shell/query_openrouter "Summarize retrieval-augmented generation."
 ```
 
-Or from an installed package:
+Or add the installed shell directory to `PATH`:
 
 ```r
-system.file("shell", "inferencer.sh", package = "inferencer")
+system.file("shell", package = "inferencer")
 ```
 
 ```sh
-source "$(Rscript -e 'cat(system.file(\"shell\", \"inferencer.sh\", package = \"inferencer\"))')"
+export PATH="$(Rscript -e 'cat(system.file(\"shell\", package = \"inferencer\"))'):$PATH"
 ```
 
 Shell API keys should live in `.zprofile`, not `.Renviron`, but they use the
@@ -98,15 +93,19 @@ query_openrouter "Summarize the main uses of retrieval-augmented generation."
 query_gemini "Write three title ideas for a data engineering memo." "gemini-2.5-flash"
 query_ollama "Explain principal component analysis in one paragraph." "gpt-oss:120b"
 query_fallback "Draft a concise status update for today's analysis."
+query_openrouter --json "Return a short JSON object."
+query_openrouter "Write release notes in markdown." | render_markdown_terminal
+list_openrouter_free_models
+list_openrouter_models --json
 ```
 
-Each `query_*` shell helper now takes:
+Each `query_*` shell helper takes:
 
 1. prompt as the first argument
 2. optional model as the second argument
 
-Successful `query_*` calls automatically render markdown for terminal output,
-including headings, bullet points, horizontal rules, and pipe tables.
+By default, query scripts print response text. With `--json`, they print the
+full parsed JSON payload.
 
 `query_fallback` uses this fixed order with each function's default model:
 

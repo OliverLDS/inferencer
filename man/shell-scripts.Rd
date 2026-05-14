@@ -4,27 +4,23 @@
 \alias{shell-scripts}
 \title{Shell Script Helpers}
 \description{
-inferencer also ships a small shell layer under \code{inst/shell/inferencer.sh}.
-Source that file from \code{zsh} to access shell functions that mirror the
-package's simple provider wrappers:
-\code{query_gemini()}, \code{query_groq()}, \code{query_openrouter()},
-\code{query_cerebras()}, \code{query_ollama()}, \code{query_fallback()}, and
-\code{render_markdown_terminal()}.
+inferencer also ships a small optional shell layer under \code{inst/shell}.
+These scripts are executable \code{zsh} command-line helpers that mirror common
+R wrapper workflows:
+\code{query_gemini}, \code{query_groq}, \code{query_openrouter}, \code{query_ollama},
+\code{query_fallback}, provider-specific \verb{list_*_models} scripts, and
+\code{render_markdown_terminal}.
 }
 \details{
-The shell functions read API keys and defaults from shell environment
+The shell scripts read API keys and defaults from shell environment
 variables, typically configured in \code{.zprofile}. The variable names are
 aligned with the R wrappers, such as \code{GEMINI_API_KEY}, \code{GROQ_API_KEY},
-\code{OPENROUTER_API_KEY}, \code{CEREBRAS_API_KEY}, and \code{OLLAMA_API_KEY}.
+\code{OPENROUTER_API_KEY}, and \code{OLLAMA_API_KEY}.
 
 They are intentionally minimal and depend on external \code{curl} and \code{jq}
-binaries. Query helpers take the prompt as the first argument and an
-optional model override as the second argument, while keeping the same
-default models as before. Successful query helpers automatically pass the
-returned text through \code{render_markdown_terminal()}.
-\code{query_fallback()} tries \code{query_gemini()}, then \code{query_openrouter()}, then
-\code{query_groq()} using each function's default model.
-It prints provider-specific stderr before moving to the next fallback.
-The Gemini shell wrapper accepts model names either with or without the
-leading \verb{models/} prefix.
+binaries. Query scripts print the model response text by default and return
+the full parsed JSON payload when called with \code{--json}. Pipe query output to
+\code{render_markdown_terminal} when terminal markdown rendering is desired.
+\code{query_fallback} tries \code{query_gemini}, then \code{query_openrouter}, then
+\code{query_groq} using each script's default model.
 }

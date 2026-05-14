@@ -1,0 +1,31 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+script_dir="${0:A:h}"
+source "${script_dir}/lib/common.zsh"
+
+usage='Usage: query_fallback [--json] "prompt"'
+inferencer_parse_query_args "$usage" "$@" || exit $?
+
+err_file="$(mktemp "${TMPDIR:-/tmp}/inferencer-fallback.XXXXXX")"
+trap 'rm -f "$err_file"' EXIT
+
+for cmd in query_gemini query_openrouter query_groq; do
+  if [[ "$INFERENCER_JSON" == true ]]; then
+    if output="$("${script_dir}/${cmd}" --json "$INFERENCER_PROMPT" 2>"$err_file")"; then
+      printf '%s\n' "$output"
+      exit 0
+    fi
+  else
+    if output="$("${script_dir}/${cmd}" "$INFERENCER_PROMPT" 2>"$err_file")"; then
+      printf '%s\n' "$output"
+      exit 0
+    fi
+  fi
+
+  print -r -- "${cmd} failed:" >&2
+  cat "$err_file" >&2
+done
+
+print -r -- "Error: all fallback providers failed in order: Gemini, OpenRouter, Groq." >&2
+exit 1
