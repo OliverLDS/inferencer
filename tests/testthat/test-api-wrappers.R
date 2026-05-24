@@ -720,10 +720,14 @@ test_that("query_ollama returns text, json, and validates prompt", {
 })
 
 test_that("query_cerebras returns text, json, and validates prompt", {
+  captured <- NULL
   testthat::local_mocked_bindings(
     request = function(url) structure(list(url = url), class = "request"),
     req_headers = function(req, ...) req,
-    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      captured <<- body
+      req
+    },
     req_error = function(req, is_error) req,
     req_perform = function(req) {
       structure(
@@ -741,6 +745,33 @@ test_that("query_cerebras returns text, json, and validates prompt", {
 
   expect_equal(query_cerebras("hello", api_key = "key"), "Cerebras reply")
   expect_equal(query_cerebras("hello", api_key = "key", json_list = TRUE)$choices[[1]]$message$content, "Cerebras reply")
+  expect_equal(captured$model, "gpt-oss-120b")
 
   expect_error(query_cerebras("", api_key = "key"), "`prompt` must be a non-empty character string.")
+})
+
+test_that("list_cerebras_models returns a data table or json list", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"object":"list","data":[{"id":"gpt-oss-120b","name":"OpenAI GPT OSS","deprecated":false},{"id":"zai-glm-4.7","name":"Z.ai GLM 4.7","deprecated":false}]}'
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  models <- list_cerebras_models()
+  expect_s3_class(models, "data.table")
+  expect_equal(models$id[[1]], "gpt-oss-120b")
+
+  json <- list_cerebras_models(json_list = TRUE)
+  expect_equal(json$data[[2]]$name, "Z.ai GLM 4.7")
 })

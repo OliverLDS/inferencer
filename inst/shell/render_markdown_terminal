@@ -4,4 +4,8 @@ set -euo pipefail
 script_dir="${0:A:h}"
 source "${script_dir}/lib/render.zsh"
 
-render_markdown_terminal_main "$@"
+if (( $# > 0 )); then
+  printf '%s\n' "$@" | render_markdown_terminal_main
+else
+  render_markdown_terminal_main
+fi

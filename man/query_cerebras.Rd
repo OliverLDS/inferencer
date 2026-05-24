@@ -6,7 +6,8 @@
 \usage{
 query_cerebras(
   prompt,
-  model = c("llama3.1-8b", "qwen-3-235b-a22b-instruct-2507"),
+  model = c("gpt-oss-120b", "zai-glm-4.7", "llama3.1-8b",
+    "qwen-3-235b-a22b-instruct-2507"),
   api_key = Sys.getenv("CEREBRAS_API_KEY"),
   url = "https://api.cerebras.ai/v1/chat/completions",
   json_list = FALSE
@@ -29,4 +30,7 @@ A character string by default, or a parsed JSON list when
 }
 \description{
 Sends a single user prompt to the Cerebras chat completions API.
+}
+\seealso{
+\code{\link[=list_cerebras_models]{list_cerebras_models()}}
 }

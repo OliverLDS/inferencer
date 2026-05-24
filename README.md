@@ -327,12 +327,18 @@ query_openrouter_content(
 query_cerebras("Explain inflation targeting in one paragraph.")
 ```
 
+Current public model catalog:
+
+```r
+cerebras_models <- list_cerebras_models()
+```
+
 Specify model:
 
 ```r
 query_cerebras(
   prompt = "Write a short introduction to algorithmic trading.",
-  model = "llama3.1-8b"
+  model = "gpt-oss-120b"
 )
 ```
 
@@ -366,6 +372,13 @@ list(
 ```
 
 ## Example workflow: inspect free or low-cost model candidates
+
+### Cerebras public models as parsed JSON
+
+```r
+cb_json <- list_cerebras_models(json_list = TRUE)
+names(cb_json)
+```
 
 ### Gemini models as parsed JSON
 

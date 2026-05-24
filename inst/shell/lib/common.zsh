@@ -137,11 +137,11 @@ inferencer_normalize_gemini_model() {
 inferencer_format_table() {
   jq -r '
     def cell($x): if $x == null then "" else ($x | tostring) end;
-    if (.data // .models // []) as $rows
-    | ($rows | type) == "array" then
-      ($rows[] | [cell(.id // .name), cell(.name // .displayName // .owned_by // "")] | @tsv)
-    else
-      empty
-    end
+    (.data // .models // []) as $rows
+    | if ($rows | type) == "array" then
+        ($rows[] | [cell(.id // .name), cell(.displayName // .name // .owned_by // "")] | @tsv)
+      else
+        empty
+      end
   ' | awk -F '\t' 'BEGIN { printf "%-45s %s\n", "id", "name"; printf "%-45s %s\n", "--", "----" } { printf "%-45s %s\n", $1, $2 }'
 }

@@ -1,3 +1,9 @@
+# inferencer 0.1.4.5
+
+- Updated the Cerebras chat wrapper to default to `gpt-oss-120b`.
+- Added `list_cerebras_models()` for the public Cerebras model catalog.
+- Updated Cerebras docs and tests to reflect the current public model set.
+
 # inferencer 0.1.4.4
 
 - Split the optional zsh shell layer into small executable scripts under `inst/shell`.

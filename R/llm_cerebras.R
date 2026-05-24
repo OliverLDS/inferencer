@@ -10,10 +10,11 @@
 #'
 #' @return A character string by default, or a parsed JSON list when
 #'   `json_list = TRUE`.
+#' @seealso [list_cerebras_models()]
 #' @export
-query_cerebras <- function(prompt, 
-  model = c("llama3.1-8b", "qwen-3-235b-a22b-instruct-2507"), # it looks like they only have two models
-  api_key = Sys.getenv("CEREBRAS_API_KEY"), 
+query_cerebras <- function(prompt,
+  model = c("gpt-oss-120b", "zai-glm-4.7", "llama3.1-8b", "qwen-3-235b-a22b-instruct-2507"),
+  api_key = Sys.getenv("CEREBRAS_API_KEY"),
   url = "https://api.cerebras.ai/v1/chat/completions",
   json_list = FALSE) {
 
@@ -49,4 +50,34 @@ query_cerebras <- function(prompt,
 
   if (json_list) return(json)
   .extract_openai_chat_content(json, "Cerebras")
+}
+
+#' List Cerebras Models
+#'
+#' Retrieves available models from the public Cerebras models endpoint.
+#'
+#' @param url Cerebras public models endpoint.
+#' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#'
+#' @return A `data.table` by default, or a parsed JSON list when
+#'   `json_list = TRUE`.
+#' @export
+list_cerebras_models <- function(
+  url = "https://api.cerebras.ai/public/v1/models",
+  json_list = FALSE
+) {
+  response <- .perform_json_request(url = url)
+  parsed <- .parse_json_response(response)
+  .stop_for_json_response(response, parsed, "Cerebras API request failed: ", "Cerebras API error")
+  res <- parsed$json
+
+  if (json_list) {
+    return(res)
+  }
+
+  if (is.null(res$data)) {
+    stop("Cerebras API response does not contain a `data` field.", call. = FALSE)
+  }
+
+  data.table::rbindlist(res$data, fill = TRUE)
 }
