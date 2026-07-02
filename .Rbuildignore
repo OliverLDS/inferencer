@@ -1,0 +1,14 @@
+^\.DS_Store$
+^.*\.DS_Store$
+^.*\.Rcheck$
+^.*\.tar\.gz$
+^\.git$
+^\.gitignore$
+^\.agents$
+^\.codex$
+^cran-comments\.md$
+^man-roxygen$
+^tmp$
+^tmp/
+^scratch$
+^scratch/
