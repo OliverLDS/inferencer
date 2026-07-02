@@ -12,6 +12,11 @@ A follow-up network-enabled check confirmed the package URLs were reachable
 and reported the expected new-submission NOTE, but the local check process
 stalled later in the standard check sequence, so it was interrupted.
 
+Additional checks:
+
+* R-hub GitHub Actions checks passed on Linux, Windows, and macOS with R-devel:
+  https://github.com/OliverLDS/inferencer/actions/runs/28589947133
+
 ## Submission notes
 
 This is a new submission.
