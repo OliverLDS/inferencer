@@ -14,12 +14,18 @@ stalled later in the standard check sequence, so it was interrupted.
 
 Additional checks:
 
+* win-builder R-devel on Windows passed with 1 NOTE:
+  https://win-builder.r-project.org/YW57sdGH9P0U/
 * R-hub GitHub Actions checks passed on Linux, Windows, and macOS with R-devel:
   https://github.com/OliverLDS/inferencer/actions/runs/28589947133
 
 ## Submission notes
 
 This is a new submission.
+
+The win-builder NOTE flags possible misspellings in DESCRIPTION. These are
+intentional provider/product names or technical terms: Cerebras, Groq,
+Ollama, OpenRouter, and embeddings.
 
 inferencer provides lightweight wrappers for hosted foundation model inference
 APIs. Most user-facing API calls require provider-specific API keys configured
