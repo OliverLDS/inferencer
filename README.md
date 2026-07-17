@@ -333,12 +333,15 @@ Current public model catalog:
 cerebras_models <- list_cerebras_models()
 ```
 
+Use `list_cerebras_models()` to inspect the current public model catalog before
+pinning a model ID, because Cerebras public models may refresh frequently.
+
 Specify model:
 
 ```r
 query_cerebras(
   prompt = "Write a short introduction to algorithmic trading.",
-  model = "gpt-oss-120b"
+  model = "gemma-4-31b"
 )
 ```
 

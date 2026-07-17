@@ -13,7 +13,7 @@
 #' @seealso [list_cerebras_models()]
 #' @export
 query_cerebras <- function(prompt,
-  model = c("gpt-oss-120b", "zai-glm-4.7", "llama3.1-8b", "qwen-3-235b-a22b-instruct-2507"),
+  model = "gpt-oss-120b",
   api_key = Sys.getenv("CEREBRAS_API_KEY"),
   url = "https://api.cerebras.ai/v1/chat/completions",
   json_list = FALSE) {
@@ -24,7 +24,7 @@ query_cerebras <- function(prompt,
 
   .require_api_key(api_key, "CEREBRAS_API_KEY")
 
-  model <- match.arg(model)
+  model <- .resolve_model_arg(model)
 
   body <- list(
     model = model,

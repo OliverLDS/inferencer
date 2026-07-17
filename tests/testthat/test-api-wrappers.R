@@ -747,7 +747,14 @@ test_that("query_cerebras returns text, json, and validates prompt", {
   expect_equal(query_cerebras("hello", api_key = "key", json_list = TRUE)$choices[[1]]$message$content, "Cerebras reply")
   expect_equal(captured$model, "gpt-oss-120b")
 
+  expect_equal(
+    query_cerebras("hello", model = "gemma-4-31b", api_key = "key"),
+    "Cerebras reply"
+  )
+  expect_equal(captured$model, "gemma-4-31b")
+
   expect_error(query_cerebras("", api_key = "key"), "`prompt` must be a non-empty character string.")
+  expect_error(query_cerebras("hello", model = "", api_key = "key"), "`model` must be a non-empty character string.")
 })
 
 test_that("list_cerebras_models returns a data table or json list", {
@@ -758,7 +765,7 @@ test_that("list_cerebras_models returns a data table or json list", {
       structure(
         list(
           status = 200L,
-          body = '{"object":"list","data":[{"id":"gpt-oss-120b","name":"OpenAI GPT OSS","deprecated":false},{"id":"zai-glm-4.7","name":"Z.ai GLM 4.7","deprecated":false}]}'
+          body = '{"object":"list","data":[{"id":"gpt-oss-120b","name":"OpenAI GPT OSS","deprecated":false},{"id":"gemma-4-31b","name":"Gemma 4 31B","deprecated":false}]}'
         ),
         class = "httr2_response"
       )
@@ -773,5 +780,5 @@ test_that("list_cerebras_models returns a data table or json list", {
   expect_equal(models$id[[1]], "gpt-oss-120b")
 
   json <- list_cerebras_models(json_list = TRUE)
-  expect_equal(json$data[[2]]$name, "Z.ai GLM 4.7")
+  expect_equal(json$data[[2]]$name, "Gemma 4 31B")
 })

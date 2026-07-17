@@ -1,3 +1,11 @@
+# inferencer 0.1.4.6
+
+- Updated the Cerebras public model set used in docs and tests.
+- Changed `query_cerebras()` to accept arbitrary non-empty model IDs to better
+  support frequent Cerebras public model refreshes.
+- Kept `list_cerebras_models()` as the recommended way to discover supported
+  Cerebras models.
+
 # inferencer 0.1.4.5
 
 - Updated the Cerebras chat wrapper to default to `gpt-oss-120b`.
