@@ -337,6 +337,154 @@ test_that("list_openrouter_video_models returns a data table or json list", {
   expect_equal(json$data[[1]]$pricing_skus$generate, "0.50")
 })
 
+test_that("list_openrouter_benchmarks normalizes Artificial Analysis results", {
+  captured_url <- NULL
+  testthat::local_mocked_bindings(
+    request = function(url) {
+      captured_url <<- url
+      structure(list(url = url), class = "request")
+    },
+    req_headers = function(req, ...) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = paste0(
+            '{"data":[{"source":"artificial-analysis",',
+            '"model_permaslug":"openai/gpt-4o","display_name":"GPT-4o",',
+            '"intelligence_index":71.2,"coding_index":65.8,"agentic_index":58.3,',
+            '"pricing":{"prompt":"0.0000025","completion":"0.00001"}}],',
+            '"meta":{"as_of":"2026-06-03T12:00:00Z",',
+            '"source_url":"https://artificialanalysis.ai"}}'
+          )
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  benchmarks <- list_openrouter_benchmarks(
+    api_key = "key",
+    source = "artificial-analysis",
+    task_type = "coding"
+  )
+
+  expect_s3_class(benchmarks, "data.table")
+  expect_equal(benchmarks$metric, c("intelligence_index", "coding_index", "agentic_index"))
+  expect_equal(benchmarks$score, c(71.2, 65.8, 58.3))
+  expect_equal(benchmarks$score_unit, rep("index_points", 3))
+  expect_equal(benchmarks$prompt_price_per_token[[1]], 0.0000025)
+  expect_equal(benchmarks$completion_price_per_token[[1]], 0.00001)
+  expect_equal(benchmarks$price_basis, rep("source_reported_per_token", 3))
+  expect_equal(benchmarks$source_as_of, rep("2026-06-03T12:00:00Z", 3))
+  expect_true(all(benchmarks$source_url == "https://artificialanalysis.ai"))
+  expect_match(captured_url, "source=artificial-analysis&task_type=coding", fixed = TRUE)
+})
+
+test_that("list_openrouter_benchmarks preserves OpenRouter task results", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = paste0(
+            '{"data":[{"source":"openrouter","model_permaslug":"openai/gpt-4o",',
+            '"display_name":"GPT-4o","benchmark_type":"gpqa_diamond",',
+            '"accuracy":0.72,"accuracy_stddev":0.03,"avg_cost_per_task":0.002,',
+            '"total_tasks":300,"last_run_timestamp":"2026-06-03T12:00:00Z"}],',
+            '"meta":{"source_url":"https://openrouter.ai/benchmarks"}}'
+          )
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  benchmarks <- list_openrouter_benchmarks(api_key = "key", source = "openrouter")
+
+  expect_equal(benchmarks$metric, "gpqa_diamond")
+  expect_equal(benchmarks$score, 0.72)
+  expect_equal(benchmarks$score_unit, "proportion")
+  expect_true(is.na(benchmarks$price_basis))
+  expect_equal(benchmarks$accuracy_stddev, 0.03)
+  expect_equal(benchmarks$avg_cost_per_task, 0.002)
+  expect_equal(benchmarks$total_tasks, 300L)
+  expect_equal(benchmarks$last_run_timestamp, "2026-06-03T12:00:00Z")
+  expect_true(is.na(benchmarks$source_as_of))
+})
+
+test_that("list_openrouter_benchmarks handles sparse Design Arena results", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = paste0(
+            '{"data":[{"source":"design-arena","model_permaslug":"model-a",',
+            '"display_name":"Model A","elo":1245,"win_rate":0.61,"rank":4}],',
+            '"meta":{}}'
+          )
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  benchmarks <- list_openrouter_benchmarks(api_key = "key", source = "design-arena")
+
+  expect_equal(benchmarks$metric, c("elo", "win_rate", "rank"))
+  expect_equal(benchmarks$score, c(1245, 0.61, 4))
+  expect_equal(benchmarks$score_unit, c("elo_points", "proportion", "ordinal_rank"))
+  expect_true(all(is.na(benchmarks$avg_cost_per_task)))
+  expect_true(all(is.na(benchmarks$accuracy_stddev)))
+  expect_true(all(is.na(benchmarks$total_tasks)))
+  expect_true(all(is.na(benchmarks$last_run_timestamp)))
+  expect_true(all(is.na(benchmarks$source_as_of)))
+  expect_equal(benchmarks$source_url, rep("https://openrouter.ai/api/v1/benchmarks?source=design-arena", 3))
+})
+
+test_that("list_openrouter_benchmarks returns typed empty results and validates filters", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(list(status = 200L, body = '{"data":[],"meta":{}}'), class = "httr2_response")
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  benchmarks <- list_openrouter_benchmarks(api_key = "key")
+  expect_s3_class(benchmarks, "data.table")
+  expect_equal(nrow(benchmarks), 0L)
+  expect_identical(typeof(benchmarks$score), "double")
+  expect_identical(typeof(benchmarks$total_tasks), "integer")
+  expect_identical(typeof(benchmarks$score_unit), "character")
+  expect_identical(typeof(benchmarks$price_basis), "character")
+  expect_identical(typeof(benchmarks$source_as_of), "character")
+  expect_s3_class(benchmarks$fetched_at, "POSIXct")
+  expect_error(list_openrouter_benchmarks(api_key = "key", source = "unknown"), "`source` must be NULL")
+  expect_error(list_openrouter_benchmarks(api_key = "key", task_type = "math"), "`task_type` must be NULL")
+})
+
 test_that("extract_openrouter_benchmarks flattens benchmark metadata", {
   models <- list(
     data = list(

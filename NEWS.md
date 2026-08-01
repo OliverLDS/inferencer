@@ -1,3 +1,9 @@
+# inferencer 0.1.4.7
+
+- Added `list_openrouter_benchmarks()` for direct refreshes from OpenRouter's
+  unified benchmarks endpoint, including source-native scores, pricing,
+  provenance, and source timestamps.
+
 # inferencer 0.1.4.6
 
 - Updated the Cerebras public model set used in docs and tests.

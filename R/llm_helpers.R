@@ -369,6 +369,155 @@
   data.table::rbindlist(rows, fill = TRUE)
 }
 
+.validate_openrouter_benchmark_filter <- function(x, arg, choices) {
+  if (is.null(x)) {
+    return(invisible(NULL))
+  }
+
+  .validate_non_empty_string(x, arg)
+  if (!x %in% choices) {
+    stop(
+      sprintf("`%s` must be NULL or one of: %s.", arg, paste(sprintf("`%s`", choices), collapse = ", ")),
+      call. = FALSE
+    )
+  }
+}
+
+.openrouter_benchmarks_url <- function(url, source = NULL, task_type = NULL) {
+  .validate_non_empty_string(url, "url")
+
+  parameters <- c()
+  if (!is.null(source)) parameters <- c(parameters, source = source)
+  if (!is.null(task_type)) parameters <- c(parameters, task_type = task_type)
+  if (length(parameters) == 0) return(url)
+
+  separator <- if (grepl("?", url, fixed = TRUE)) "&" else "?"
+  query <- paste(
+    paste0(names(parameters), "=", vapply(parameters, utils::URLencode, character(1), reserved = TRUE)),
+    collapse = "&"
+  )
+  paste0(url, separator, query)
+}
+
+.openrouter_benchmark_empty_table <- function() {
+  data.table::data.table(
+    model_id = character(),
+    model_name = character(),
+    source = character(),
+    metric = character(),
+    score = numeric(),
+    score_unit = character(),
+    prompt_price_per_token = numeric(),
+    completion_price_per_token = numeric(),
+    price_basis = character(),
+    avg_cost_per_task = numeric(),
+    accuracy_stddev = numeric(),
+    total_tasks = integer(),
+    last_run_timestamp = character(),
+    source_as_of = character(),
+    source_url = character(),
+    endpoint = character(),
+    fetched_at = as.POSIXct(character(), tz = "UTC")
+  )
+}
+
+.openrouter_benchmark_value <- function(x) {
+  if (is.null(x) || length(x) != 1 || is.na(x)) return(NA_real_)
+  suppressWarnings(as.numeric(x))
+}
+
+.openrouter_benchmark_text <- function(x) {
+  if (!is.character(x) || length(x) != 1 || is.na(x)) return(NA_character_)
+  x
+}
+
+.openrouter_benchmark_score_unit <- function(source, metric) {
+  if (identical(source, "openrouter")) return("proportion")
+
+  units <- c(
+    "artificial-analysis::intelligence_index" = "index_points",
+    "artificial-analysis::coding_index" = "index_points",
+    "artificial-analysis::agentic_index" = "index_points",
+    "design-arena::elo" = "elo_points",
+    "design-arena::win_rate" = "proportion",
+    "design-arena::rank" = "ordinal_rank"
+  )
+
+  unit <- units[paste(source, metric, sep = "::")]
+  if (is.null(unit)) NA_character_ else unname(unit)
+}
+
+.openrouter_benchmark_rows <- function(records, meta = NULL, endpoint, fetched_at) {
+  if (length(records) == 0) return(.openrouter_benchmark_empty_table())
+
+  meta_source_url <- if (is.list(meta)) .openrouter_benchmark_text(meta$source_url) else NA_character_
+  source_as_of <- if (is.list(meta)) .openrouter_benchmark_text(meta$as_of) else NA_character_
+  rows <- list()
+  index <- 1L
+
+  for (record in records) {
+    if (!is.list(record)) next
+
+    source <- .openrouter_benchmark_text(record$source)
+    model_id <- .openrouter_benchmark_text(record$model_permaslug)
+    if (is.na(model_id)) model_id <- .openrouter_benchmark_text(record$model_id)
+    model_name <- .openrouter_benchmark_text(record$display_name)
+    if (is.na(model_name)) model_name <- .openrouter_benchmark_text(record$model_name)
+
+    pricing <- if (is.list(record$pricing)) record$pricing else list()
+    prompt_price <- .openrouter_benchmark_value(pricing$prompt)
+    completion_price <- .openrouter_benchmark_value(pricing$completion)
+    source_url <- .openrouter_benchmark_text(record$source_url)
+    if (is.na(source_url)) source_url <- meta_source_url
+    if (is.na(source_url)) source_url <- endpoint
+
+    metrics <- switch(
+      source,
+      "artificial-analysis" = c("intelligence_index", "coding_index", "agentic_index"),
+      "openrouter" = if (is.character(record$benchmark_type) && length(record$benchmark_type) == 1) record$benchmark_type else "accuracy",
+      "design-arena" = c("elo", "win_rate", "rank"),
+      character()
+    )
+
+    values <- switch(
+      source,
+      "artificial-analysis" = lapply(metrics, function(metric) record[[metric]]),
+      "openrouter" = list(record$accuracy),
+      "design-arena" = lapply(metrics, function(metric) record[[metric]]),
+      list()
+    )
+
+    for (i in seq_along(metrics)) {
+      score <- .openrouter_benchmark_value(values[[i]])
+      if (is.na(score)) next
+
+      rows[[index]] <- list(
+        model_id = model_id,
+        model_name = model_name,
+        source = source,
+        metric = metrics[[i]],
+        score = score,
+        score_unit = .openrouter_benchmark_score_unit(source, metrics[[i]]),
+        prompt_price_per_token = prompt_price,
+        completion_price_per_token = completion_price,
+        price_basis = if (!is.na(prompt_price) || !is.na(completion_price)) "source_reported_per_token" else NA_character_,
+        avg_cost_per_task = .openrouter_benchmark_value(record$avg_cost_per_task),
+        accuracy_stddev = .openrouter_benchmark_value(record$accuracy_stddev),
+        total_tasks = as.integer(.openrouter_benchmark_value(record$total_tasks)),
+        last_run_timestamp = .openrouter_benchmark_text(record$last_run_timestamp),
+        source_as_of = source_as_of,
+        source_url = source_url,
+        endpoint = endpoint,
+        fetched_at = as.POSIXct(fetched_at, tz = "UTC")
+      )
+      index <- index + 1L
+    }
+  }
+
+  if (length(rows) == 0) return(.openrouter_benchmark_empty_table())
+  data.table::rbindlist(rows, fill = TRUE)
+}
+
 .coerce_openrouter_models_input <- function(models) {
   if (is.list(models) && !is.data.frame(models) && !is.null(models$data) && is.list(models$data)) {
     return(models$data)

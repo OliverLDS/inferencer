@@ -150,7 +150,19 @@ Parsed JSON list:
 openrouter_json <- list_openrouter_models(json_list = TRUE)
 ```
 
-Extract benchmark fields if OpenRouter includes them in model metadata:
+Refresh benchmark results directly from OpenRouter's benchmarks endpoint:
+
+```r
+or_benchmarks <- list_openrouter_benchmarks(
+  source = "artificial-analysis",
+  task_type = "coding"
+)
+head(or_benchmarks)
+```
+
+`extract_openrouter_benchmarks()` remains available to inspect benchmark fields
+already present in a saved models response, but it is not the recommended
+interface for refreshing benchmark data:
 
 ```r
 or_benchmarks <- extract_openrouter_benchmarks(openrouter_json)

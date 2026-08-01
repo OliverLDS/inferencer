@@ -225,6 +225,66 @@ list_openrouter_video_models <- function(
   .openrouter_video_model_rows(res$data)
 }
 
+#' List OpenRouter Benchmarks
+#'
+#' Retrieves benchmark results directly from OpenRouter's unified benchmarks
+#' endpoint. Unlike [extract_openrouter_benchmarks()], this function does not
+#' inspect model metadata and is intended for benchmark refresh workflows.
+#'
+#' @param api_key OpenRouter API key. Defaults to
+#'   `Sys.getenv("OPENROUTER_API_KEY")`.
+#' @param source Optional benchmark source: `"artificial-analysis"`,
+#'   `"design-arena"`, or `"openrouter"`.
+#' @param task_type Optional workload filter: `"intelligence"`, `"coding"`,
+#'   or `"agentic"`.
+#' @param url OpenRouter benchmarks endpoint.
+#'
+#' @return A long `data.table` with one row per model and benchmark metric.
+#'   The returned scores retain the source-native scale. Provider-supplied
+#'   source timestamps and URLs, plus the queried endpoint, are retained for
+#'   provenance. `price_basis` identifies provider-reported per-token pricing
+#'   and is distinct from `avg_cost_per_task`.
+#' @export
+list_openrouter_benchmarks <- function(
+  api_key = Sys.getenv("OPENROUTER_API_KEY"),
+  source = NULL,
+  task_type = NULL,
+  url = "https://openrouter.ai/api/v1/benchmarks"
+) {
+  .require_api_key(api_key, "OPENROUTER_API_KEY")
+  .validate_openrouter_benchmark_filter(
+    source,
+    "source",
+    c("artificial-analysis", "design-arena", "openrouter")
+  )
+  .validate_openrouter_benchmark_filter(
+    task_type,
+    "task_type",
+    c("intelligence", "coding", "agentic")
+  )
+
+  endpoint <- .openrouter_benchmarks_url(url, source, task_type)
+  response <- .perform_json_request(
+    url = endpoint,
+    headers = list(
+      "Authorization" = paste("Bearer", api_key)
+    )
+  )
+  parsed <- .parse_json_response(response)
+  .stop_for_json_response(response, parsed, "OpenRouter API request failed: ", "OpenRouter API error")
+
+  if (is.null(parsed$json$data) || !is.list(parsed$json$data)) {
+    stop("OpenRouter benchmarks response does not contain a `data` list.", call. = FALSE)
+  }
+
+  .openrouter_benchmark_rows(
+    records = parsed$json$data,
+    meta = parsed$json$meta,
+    endpoint = endpoint,
+    fetched_at = Sys.time()
+  )
+}
+
 #' Extract Benchmark Scores from OpenRouter Model Metadata
 #'
 #' Scans OpenRouter model metadata for benchmark payloads, including possible
