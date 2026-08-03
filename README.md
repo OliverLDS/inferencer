@@ -7,6 +7,7 @@ usage without writing R code.
 
 It currently supports:
 
+- OpenAI
 - Google Gemini
 - Groq
 - OpenRouter
@@ -34,6 +35,7 @@ Set your API keys first:
 
 ```r
 Sys.setenv(GEMINI_API_KEY = "your_key_here")
+Sys.setenv(OPENAI_API_KEY = "your_key_here")
 Sys.setenv(GROQ_API_KEY = "your_key_here")
 Sys.setenv(OPENROUTER_API_KEY = "your_key_here")
 Sys.setenv(CEREBRAS_API_KEY = "your_key_here")
@@ -117,6 +119,13 @@ If all three calls fail, it exits with a non-zero status.
 
 ## List available models
 
+### OpenAI
+
+```r
+openai_models <- list_openai_models()
+head(openai_models)
+```
+
 ### Gemini
 
 ```r
@@ -193,6 +202,28 @@ head(ollama_models)
 ```
 
 ## Query models
+
+### OpenAI
+
+OpenAI requests use the Responses API:
+
+```r
+query_openai("Explain retrieval-augmented generation in plain English.")
+```
+
+Use structured Responses API input or inspect the complete response:
+
+```r
+response <- query_openai(
+  input = list(
+    list(
+      role = "user",
+      content = list(list(type = "input_text", text = "Summarize this topic."))
+    )
+  ),
+  json_list = TRUE
+)
+```
 
 ### Gemini
 
@@ -285,6 +316,15 @@ query_groq(
 )
 ```
 
+Request an SSE response and assemble its text:
+
+```r
+query_groq("Explain vector databases briefly.", stream = TRUE)
+```
+
+Groq SSE responses are currently buffered and parsed before the function
+returns. This does not print tokens incrementally to the terminal.
+
 ### OpenRouter
 
 ```r
@@ -298,6 +338,17 @@ query_openrouter(
   prompt = "Rewrite this in a more professional tone: our app is pretty good at searching files",
   model = "stepfun/step-3.5-flash:free",
   temperature = 0
+)
+```
+
+Request token log probabilities and retain the complete response:
+
+```r
+response <- query_openrouter(
+  "Classify this review as positive or negative.",
+  logprobs = TRUE,
+  top_logprobs = 5,
+  json_list = TRUE
 )
 ```
 
@@ -385,6 +436,21 @@ list(
   ollama = query_ollama(prompt)
 )
 ```
+
+## Live provider smoke tests
+
+The normal test suite mocks HTTP requests and never consumes API quota. Release
+validation can opt into four live behavior checks for OpenAI Responses,
+OpenRouter log probabilities, buffered Groq SSE assembly, and Cerebras' shared
+OpenAI-compatible transport:
+
+```sh
+Rscript tools/smoke-test-live-providers.R
+```
+
+The script requires the corresponding provider keys. Override the default live
+test models with `INFERENCER_OPENROUTER_LOGPROBS_MODEL` and
+`INFERENCER_GROQ_STREAM_MODEL` when provider availability changes.
 
 ## Example workflow: inspect free or low-cost model candidates
 

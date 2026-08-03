@@ -276,6 +276,88 @@ test_that("query_groq validates local parameters", {
   expect_error(query_groq("hello", api_key = "key", stream = "yes"), "`stream` must be TRUE or FALSE.")
 })
 
+test_that("OpenAI-compatible wrappers handle non-JSON HTTP errors", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(status = 503L, body = "<html>service unavailable</html>"),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_error(
+    query_cerebras("hello", api_key = "key"),
+    "Cerebras API request failed: <html>service unavailable</html>",
+    fixed = TRUE
+  )
+})
+
+test_that("query_groq parses streaming SSE responses", {
+  captured_body <- NULL
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      captured_body <<- body
+      req$body <- body
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = paste0(
+            'data: {"id":"chat-1","choices":[{"delta":{"role":"assistant"}}]}\n\n',
+            'data: {"id":"chat-1","choices":[{"delta":{"content":"Streamed"}}]}\n\n',
+            'data: {"id":"chat-1","choices":[{"delta":{"content":" reply"},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n'
+          )
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_equal(query_groq("hello", api_key = "key", stream = TRUE), "Streamed reply")
+  expect_true(captured_body$stream)
+
+  chunks <- query_groq("hello", api_key = "key", stream = TRUE, json_list = TRUE)
+  expect_length(chunks, 3L)
+  expect_equal(chunks[[2]]$choices[[1]]$delta$content, "Streamed")
+})
+
+test_that("query_groq surfaces streaming API errors", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(status = 200L, body = 'data: {"error":{"message":"upstream failed"}}\n\ndata: [DONE]\n\n'),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_error(query_groq("hello", api_key = "key", stream = TRUE), "Groq API error: upstream failed")
+})
+
 test_that("list_openrouter_models returns a data table or json list", {
   testthat::local_mocked_bindings(
     request = function(url) structure(list(url = url), class = "request"),
@@ -624,6 +706,244 @@ test_that("query_openrouter returns text, json, and API errors", {
   expect_error(query_openrouter("hello", api_key = "key"), "OpenRouter API error: bad request")
   expect_error(query_openrouter("hello", api_key = "key", temperature = -1), "`temperature` must be greater than or equal to 0.")
   expect_error(query_openrouter("hello", api_key = "key", top_p = 2), "`top_p` must be between 0 and 1.")
+})
+
+test_that("query_openrouter sends log probability parameters", {
+  captured_body <- NULL
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      captured_body <<- body
+      req$body <- body
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = paste0(
+            '{"choices":[{"message":{"content":"answer"},"logprobs":{"content":[',
+            '{"token":"answer","logprob":-0.1,"top_logprobs":[]}]}}]}'
+          )
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  response <- query_openrouter(
+    "hello",
+    api_key = "key",
+    logprobs = TRUE,
+    top_logprobs = 5,
+    json_list = TRUE
+  )
+
+  expect_true(captured_body$logprobs)
+  expect_identical(captured_body$top_logprobs, 5L)
+  expect_equal(response$choices[[1]]$logprobs$content[[1]]$logprob, -0.1)
+  expect_error(query_openrouter("hello", api_key = "key", logprobs = 1), "`logprobs` must be TRUE or FALSE.")
+  expect_error(query_openrouter("hello", api_key = "key", top_logprobs = 5), "requires `logprobs = TRUE`")
+  expect_error(
+    query_openrouter("hello", api_key = "key", logprobs = TRUE, top_logprobs = 21),
+    "integer from 0 through 20"
+  )
+})
+
+test_that("OpenAI-compatible transport accepts provider parameters", {
+  captured_body <- NULL
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      captured_body <<- body
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(status = 200L, body = '{"choices":[{"message":{"content":"ok"}}]}'),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  response <- inferencer:::.openai_compatible_chat_request(
+    url = "https://example.com/chat/completions",
+    api_key = "key",
+    provider = "Example",
+    model = "model-a",
+    messages = list(list(role = "user", content = "hello")),
+    parameters = list(seed = 42L, response_format = list(type = "json_object"))
+  )
+
+  expect_equal(response$choices[[1]]$message$content, "ok")
+  expect_identical(captured_body$seed, 42L)
+  expect_equal(captured_body$response_format$type, "json_object")
+})
+
+test_that("query_openai returns Responses API text and raw JSON", {
+  captured_body <- NULL
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      captured_body <<- body
+      req$body <- body
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = paste0(
+            '{"id":"resp_1","status":"completed","output":[{"type":"message",',
+            '"content":[{"type":"output_text","text":"OpenAI reply"}]}]}'
+          )
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  tools <- list(list(type = "web_search"))
+  expect_equal(
+    query_openai(
+      "hello",
+      api_key = "key",
+      instructions = "Answer briefly.",
+      max_output_tokens = 100,
+      tools = tools
+    ),
+    "OpenAI reply"
+  )
+  expect_equal(captured_body$model, "gpt-5.6")
+  expect_equal(captured_body$input, "hello")
+  expect_identical(captured_body$max_output_tokens, 100L)
+  expect_equal(captured_body$tools, tools)
+
+  response <- query_openai("hello", api_key = "key", json_list = TRUE)
+  expect_equal(response$id, "resp_1")
+})
+
+test_that("list_openai_models returns a data table or raw JSON", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = paste0(
+            '{"object":"list","data":[',
+            '{"id":"gpt-5.6","object":"model","created":1785686400,"owned_by":"openai"}',
+            ']}'
+          )
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  models <- list_openai_models(api_key = "key")
+  expect_s3_class(models, "data.table")
+  expect_equal(models$id, "gpt-5.6")
+  expect_equal(models$owned_by, "openai")
+
+  response <- list_openai_models(api_key = "key", json_list = TRUE)
+  expect_equal(response$data[[1]]$id, "gpt-5.6")
+})
+
+test_that("list_openai_models surfaces API and shape errors", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(list(status = 401L, body = '{"error":{"message":"bad key"}}'), class = "httr2_response")
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_error(list_openai_models(api_key = "key"), "OpenAI API error: bad key")
+
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(list(status = 200L, body = '{"object":"list"}'), class = "httr2_response")
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_error(list_openai_models(api_key = "key"), "does not contain a `data` list")
+})
+
+test_that("query_openai supports structured input and API errors", {
+  captured_body <- NULL
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      captured_body <<- body
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(status = 200L, body = '{"output_text":"Structured reply"}'),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  input <- list(list(role = "user", content = list(list(type = "input_text", text = "hello"))))
+  expect_equal(query_openai(input, api_key = "key"), "Structured reply")
+  expect_equal(captured_body$input, input)
+  expect_error(query_openai("", api_key = "key"), "`input` must be a non-empty character string or list.")
+  expect_error(query_openai("hello", api_key = "key", max_output_tokens = 1.5), "positive integer")
+
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(status = 401L, body = '{"error":{"message":"bad key"}}'),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_error(query_openai("hello", api_key = "key"), "OpenAI API error: bad key")
 })
 
 test_that("query_openrouter_content accepts multimodal content blocks", {

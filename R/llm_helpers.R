@@ -20,12 +20,206 @@
     httr2::req_perform()
 }
 
+.openai_json_request <- function(
+  url,
+  api_key,
+  body,
+  provider,
+  stream = FALSE,
+  headers = NULL,
+  api_error_prefix = NULL
+) {
+  request_headers <- c(
+    list(
+      "Content-Type" = "application/json",
+      "Authorization" = paste("Bearer", api_key)
+    ),
+    headers
+  )
+
+  response <- .perform_json_request(
+    url = url,
+    headers = request_headers,
+    body = body
+  )
+
+  if (httr2::resp_status(response) >= 300 || !stream) {
+    parsed <- .parse_json_response(response)
+    .stop_for_json_response(
+      response,
+      parsed,
+      paste0(provider, " API request failed: "),
+      api_error_prefix
+    )
+    return(parsed$json)
+  }
+
+  chunks <- .parse_openai_sse_response(response, provider)
+  .stop_for_openai_stream_error(chunks, provider)
+  chunks
+}
+
+.openai_compatible_chat_request <- function(
+  url,
+  api_key,
+  provider,
+  model,
+  messages,
+  parameters = list(),
+  stream = FALSE,
+  headers = NULL,
+  api_error_prefix = NULL
+) {
+  body <- utils::modifyList(
+    list(
+      model = model,
+      messages = messages,
+      stream = stream
+    ),
+    parameters
+  )
+
+  .openai_json_request(
+    url = url,
+    api_key = api_key,
+    body = body,
+    provider = provider,
+    stream = stream,
+    headers = headers,
+    api_error_prefix = api_error_prefix
+  )
+}
+
+.parse_openai_sse_response <- function(response, provider) {
+  text <- httr2::resp_body_string(response)
+  text <- gsub("\r\n?", "\n", text)
+  blocks <- strsplit(text, "\n\n", fixed = TRUE)[[1]]
+  payloads <- lapply(blocks, function(block) {
+    lines <- strsplit(block, "\n", fixed = TRUE)[[1]]
+    data_lines <- grep("^data:", lines, value = TRUE)
+    if (length(data_lines) == 0) return(NULL)
+
+    data_lines <- sub("^data:[[:space:]]?", "", data_lines)
+    payload <- paste(data_lines, collapse = "\n")
+    if (!nzchar(payload) || identical(payload, "[DONE]")) return(NULL)
+    payload
+  })
+  payloads <- Filter(Negate(is.null), payloads)
+
+  if (length(payloads) == 0) {
+    parsed <- tryCatch(
+      jsonlite::fromJSON(text, simplifyVector = FALSE),
+      error = function(e) NULL
+    )
+    message <- .api_error_message(parsed)
+    if (!is.null(message)) {
+      stop(sprintf("%s API error: %s", provider, message), call. = FALSE)
+    }
+    stop(sprintf("%s API returned no streaming events.", provider), call. = FALSE)
+  }
+
+  lapply(payloads, function(payload) {
+    tryCatch(
+      jsonlite::fromJSON(payload, simplifyVector = FALSE),
+      error = function(e) {
+        stop(
+          sprintf("%s API returned an invalid streaming event: %s", provider, conditionMessage(e)),
+          call. = FALSE
+        )
+      }
+    )
+  })
+}
+
+.stop_for_openai_stream_error <- function(chunks, provider) {
+  for (chunk in chunks) {
+    message <- .api_error_message(chunk)
+    if (!is.null(message)) {
+      stop(sprintf("%s API error: %s", provider, message), call. = FALSE)
+    }
+  }
+}
+
+.extract_openai_stream_text <- function(chunks, provider) {
+  parts <- lapply(chunks, function(chunk) {
+    if (is.null(chunk$choices) || length(chunk$choices) < 1) return(NULL)
+    delta <- chunk$choices[[1]]$delta
+    if (is.null(delta)) return(NULL)
+    content <- delta$content
+    if (is.character(content) && length(content) == 1) content else NULL
+  })
+  parts <- Filter(Negate(is.null), parts)
+
+  if (length(parts) == 0) {
+    stop(
+      sprintf("%s API returned no streaming text content. Call with `json_list = TRUE` to inspect the events.", provider),
+      call. = FALSE
+    )
+  }
+
+  paste0(unlist(parts, use.names = FALSE), collapse = "")
+}
+
+.normalize_openai_responses_input <- function(input) {
+  if (is.character(input) && length(input) == 1 && !is.na(input) && nzchar(input)) {
+    return(input)
+  }
+
+  if (!is.list(input) || length(input) < 1) {
+    stop("`input` must be a non-empty character string or list.", call. = FALSE)
+  }
+
+  input
+}
+
+.extract_openai_response_text <- function(parsed) {
+  if (is.character(parsed$output_text) && length(parsed$output_text) == 1 && nzchar(parsed$output_text)) {
+    return(parsed$output_text)
+  }
+
+  if (is.null(parsed$output) || !is.list(parsed$output)) {
+    stop("OpenAI API returned no output items.", call. = FALSE)
+  }
+
+  text <- list()
+  index <- 1L
+  for (item in parsed$output) {
+    if (!is.list(item) || is.null(item$content) || !is.list(item$content)) next
+
+    for (part in item$content) {
+      if (!is.list(part) || !identical(part$type, "output_text")) next
+      if (is.character(part$text) && length(part$text) == 1 && nzchar(part$text)) {
+        text[[index]] <- part$text
+        index <- index + 1L
+      }
+    }
+  }
+
+  if (length(text) == 0) {
+    stop(
+      "OpenAI API returned no text output. Call with `json_list = TRUE` to inspect the response.",
+      call. = FALSE
+    )
+  }
+
+  paste(unlist(text, use.names = FALSE), collapse = "\n")
+}
+
 .parse_json_response <- function(response) {
   txt <- httr2::resp_body_string(response)
+  parse_error <- NULL
+  json <- tryCatch(
+    jsonlite::fromJSON(txt, simplifyVector = FALSE),
+    error = function(error) {
+      parse_error <<- error
+      NULL
+    }
+  )
 
   list(
     text = txt,
-    json = jsonlite::fromJSON(txt, simplifyVector = FALSE)
+    json = json,
+    parse_error = parse_error
   )
 }
 
@@ -46,6 +240,15 @@
     }
 
     stop(request_failed_prefix, parsed$text, call. = FALSE)
+  }
+
+  if (!is.null(parsed$parse_error)) {
+    stop(
+      request_failed_prefix,
+      "invalid JSON response: ",
+      conditionMessage(parsed$parse_error),
+      call. = FALSE
+    )
   }
 
   msg <- .api_error_message(parsed$json)

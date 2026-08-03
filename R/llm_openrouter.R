@@ -385,6 +385,10 @@ extract_openrouter_benchmarks <- function(
 #' @param top_p Nucleus sampling parameter.
 #' @param max_tokens Maximum number of output tokens.
 #' @param reasoning Whether to enable reasoning mode.
+#' @param logprobs Whether to return log probabilities for output tokens.
+#' @param top_logprobs Optional number of most likely tokens to return at each
+#'   position. Must be an integer from 0 through 20 and requires
+#'   `logprobs = TRUE`.
 #' @param api_key OpenRouter API key. Defaults to
 #'   `Sys.getenv("OPENROUTER_API_KEY")`.
 #' @param url OpenRouter chat completions endpoint.
@@ -400,6 +404,8 @@ query_openrouter <- function(
   top_p = 1,
   max_tokens = 2048L,
   reasoning = TRUE,
+  logprobs = FALSE,
+  top_logprobs = NULL,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset = "https://openrouter.ai/api/v1/chat/completions"),
   json_list = FALSE
@@ -411,6 +417,8 @@ query_openrouter <- function(
     top_p = top_p,
     max_tokens = max_tokens,
     reasoning = reasoning,
+    logprobs = logprobs,
+    top_logprobs = top_logprobs,
     api_key = api_key,
     url = url,
     json_list = json_list

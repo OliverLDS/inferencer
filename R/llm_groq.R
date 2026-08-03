@@ -44,11 +44,14 @@ list_groq_models <- function(api_key = Sys.getenv("GROQ_API_KEY"), url = "https:
 #' @param temperature Sampling temperature.
 #' @param top_p Nucleus sampling parameter.
 #' @param max_tokens Maximum number of output tokens.
-#' @param stream Whether to request streaming output.
+#' @param stream Whether to request an SSE response. The complete response is
+#'   buffered and assembled before the function returns; tokens are not printed
+#'   incrementally to the terminal.
 #' @param json_list If `TRUE`, return the parsed JSON response as a list.
 #'
-#' @return A character string by default, or a parsed JSON list when
-#'   `json_list = TRUE`.
+#' @return A character string by default. With `json_list = TRUE`, returns a
+#'   parsed JSON response for non-streaming requests or a list of parsed SSE
+#'   chunks for streaming requests.
 #' @export
 query_groq <- function(prompt, api_key = Sys.getenv("GROQ_API_KEY"),
   url = Sys.getenv("GROQ_API_URL", unset = "https://api.groq.com/openai/v1/chat/completions"),
@@ -88,27 +91,21 @@ query_groq <- function(prompt, api_key = Sys.getenv("GROQ_API_KEY"),
 
   model <- match.arg(model)
 
-  body <- list(
-    messages = list(list(role = "user", content = prompt)),
-    model = model,
-    temperature = temperature,
-    top_p = top_p,
-    stream = stream,
-    max_tokens = max_tokens
-  )
-
-  response <- .perform_json_request(
+  parsed <- .openai_compatible_chat_request(
     url = url,
-    headers = list(
-      "Content-Type" = "application/json",
-      Authorization = paste("Bearer", api_key)
+    api_key = api_key,
+    provider = "Groq",
+    model = model,
+    messages = list(list(role = "user", content = prompt)),
+    parameters = list(
+      temperature = temperature,
+      top_p = top_p,
+      max_tokens = max_tokens
     ),
-    body = body
+    stream = stream
   )
-  parsed_resp <- .parse_json_response(response)
-  .stop_for_json_response(response, parsed_resp, "Groq API request failed: ", NULL)
-  parsed <- parsed_resp$json
 
   if (json_list) return(parsed)
+  if (stream) return(.extract_openai_stream_text(parsed, "Groq"))
   .extract_openai_chat_content(parsed, "Groq")
 }

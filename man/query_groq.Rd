@@ -38,13 +38,16 @@ query_groq(
 
 \item{max_tokens}{Maximum number of output tokens.}
 
-\item{stream}{Whether to request streaming output.}
+\item{stream}{Whether to request an SSE response. The complete response is
+buffered and assembled before the function returns; tokens are not printed
+incrementally to the terminal.}
 
 \item{json_list}{If \code{TRUE}, return the parsed JSON response as a list.}
 }
 \value{
-A character string by default, or a parsed JSON list when
-\code{json_list = TRUE}.
+A character string by default. With \code{json_list = TRUE}, returns a
+parsed JSON response for non-streaming requests or a list of parsed SSE
+chunks for streaming requests.
 }
 \description{
 Sends a single user prompt to the Groq chat completions API.

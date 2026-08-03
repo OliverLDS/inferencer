@@ -26,27 +26,20 @@ query_cerebras <- function(prompt,
 
   model <- .resolve_model_arg(model)
 
-  body <- list(
-    model = model,
-    stream = FALSE,
-    messages = list(list(role = "user", content = prompt)),
-    temperature = 0,
-    max_tokens = -1,
-    seed = 0,
-    top_p = 1
-  )
-
-  res <- .perform_json_request(
+  json <- .openai_compatible_chat_request(
     url = url,
-    headers = list(
-      "Content-Type" = "application/json",
-      "Authorization" = paste("Bearer", api_key)
+    api_key = api_key,
+    provider = "Cerebras",
+    model = model,
+    messages = list(list(role = "user", content = prompt)),
+    parameters = list(
+      temperature = 0,
+      max_tokens = -1,
+      seed = 0,
+      top_p = 1
     ),
-    body = body
+    stream = FALSE
   )
-  parsed <- .parse_json_response(res)
-  .stop_for_json_response(res, parsed, "Cerebras API request failed: ", NULL)
-  json <- parsed$json
 
   if (json_list) return(json)
   .extract_openai_chat_content(json, "Cerebras")

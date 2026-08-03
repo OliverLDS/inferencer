@@ -290,6 +290,10 @@ generate_image_gemini <- function(prompt,
 #' @param top_p Nucleus sampling parameter.
 #' @param max_tokens Maximum number of output tokens.
 #' @param reasoning Whether to enable reasoning mode.
+#' @param logprobs Whether to return log probabilities for output tokens.
+#' @param top_logprobs Optional number of most likely tokens to return at each
+#'   position. Must be an integer from 0 through 20 and requires
+#'   `logprobs = TRUE`.
 #' @param modalities Optional output modalities, for example `"text"` or
 #'   `c("text", "image")`.
 #' @param api_key OpenRouter API key. Defaults to
@@ -307,6 +311,8 @@ query_openrouter_content <- function(content,
   top_p = 1,
   max_tokens = 2048L,
   reasoning = TRUE,
+  logprobs = FALSE,
+  top_logprobs = NULL,
   modalities = NULL,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset = "https://openrouter.ai/api/v1/chat/completions"),
@@ -339,6 +345,21 @@ query_openrouter_content <- function(content,
     stop("`reasoning` must be TRUE or FALSE.", call. = FALSE)
   }
 
+  if (!is.logical(logprobs) || length(logprobs) != 1 || is.na(logprobs)) {
+    stop("`logprobs` must be TRUE or FALSE.", call. = FALSE)
+  }
+
+  if (!is.null(top_logprobs)) {
+    if (!is.numeric(top_logprobs) || length(top_logprobs) != 1 || is.na(top_logprobs) ||
+        top_logprobs < 0 || top_logprobs > 20 || top_logprobs != as.integer(top_logprobs)) {
+      stop("`top_logprobs` must be NULL or a single integer from 0 through 20.", call. = FALSE)
+    }
+    if (!logprobs) {
+      stop("`top_logprobs` requires `logprobs = TRUE`.", call. = FALSE)
+    }
+    top_logprobs <- as.integer(top_logprobs)
+  }
+
   if (!is.null(modalities)) {
     if (!is.character(modalities) || length(modalities) < 1 || any(!nzchar(modalities))) {
       stop("`modalities` must be a non-empty character vector or NULL.", call. = FALSE)
@@ -347,7 +368,28 @@ query_openrouter_content <- function(content,
 
   model <- .resolve_model_arg(model)
 
-  body <- list(
+  parameters <- list(
+    temperature = temperature,
+    top_p = top_p,
+    max_tokens = max_tokens,
+    reasoning = list(
+      enabled = reasoning
+    ),
+    logprobs = logprobs
+  )
+
+  if (!is.null(modalities)) {
+    parameters$modalities <- unname(modalities)
+  }
+
+  if (!is.null(top_logprobs)) {
+    parameters$top_logprobs <- top_logprobs
+  }
+
+  json <- .openai_compatible_chat_request(
+    url = url,
+    api_key = api_key,
+    provider = "OpenRouter",
     model = model,
     messages = list(
       list(
@@ -355,29 +397,10 @@ query_openrouter_content <- function(content,
         content = content
       )
     ),
-    temperature = temperature,
-    top_p = top_p,
-    max_tokens = max_tokens,
-    reasoning = list(
-      enabled = reasoning
-    )
+    parameters = parameters,
+    stream = FALSE,
+    api_error_prefix = "OpenRouter API error"
   )
-
-  if (!is.null(modalities)) {
-    body$modalities <- unname(modalities)
-  }
-
-  resp <- .perform_json_request(
-    url = url,
-    headers = list(
-      "Content-Type" = "application/json",
-      "Authorization" = paste("Bearer", api_key)
-    ),
-    body = body
-  )
-  parsed <- .parse_json_response(resp)
-  .stop_for_json_response(resp, parsed, "OpenRouter API request failed: ", "OpenRouter API error")
-  json <- parsed$json
 
   if (json_list) {
     return(json)

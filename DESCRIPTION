@@ -1,7 +1,7 @@
 Package: inferencer
 Type: Package
 Title: Simple Unified Wrappers for Hosted Foundation Model Inference APIs
-Version: 0.1.4.7
+Version: 0.2.0
 Authors@R: 
     person(
       given = "Oliver",
@@ -13,7 +13,8 @@ Author: Oliver Zhou [aut, cre]
 Maintainer: Oliver Zhou <oliver.yxzhou@gmail.com>
 Description: Provides lightweight R wrappers for querying and listing models
     from several hosted foundation model inference platforms, currently
-    including Google Gemini, Groq, OpenRouter, Cerebras, and Ollama Cloud.
+    including OpenAI, Google Gemini, Groq, OpenRouter, Cerebras, and Ollama
+    Cloud.
     The package is designed for simple inference workflows and quick
     experimentation, with minimal abstraction and a consistent interface
     across providers. It includes helper functions for model discovery, text

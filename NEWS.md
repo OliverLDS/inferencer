@@ -1,3 +1,15 @@
+# inferencer 0.2.0
+
+- Added direct OpenAI Responses API support through `query_openai()` and model
+  discovery through `list_openai_models()`.
+- Added OpenRouter `logprobs` and `top_logprobs` request parameters.
+- Added Groq SSE response parsing for `stream = TRUE`; responses are buffered
+  and assembled before return rather than emitted incrementally.
+- Consolidated OpenAI-compatible chat requests behind a shared internal
+  transport while preserving provider-specific exported wrappers.
+- Added opt-in live provider smoke tests for the four new transport behaviors.
+- Improved errors for provider failures that return non-JSON response bodies.
+
 # inferencer 0.1.4.7
 
 - Added `list_openrouter_benchmarks()` for direct refreshes from OpenRouter's

@@ -11,6 +11,8 @@ query_openrouter_content(
   top_p = 1,
   max_tokens = 2048L,
   reasoning = TRUE,
+  logprobs = FALSE,
+  top_logprobs = NULL,
   modalities = NULL,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset =
@@ -31,6 +33,12 @@ style content blocks.}
 \item{max_tokens}{Maximum number of output tokens.}
 
 \item{reasoning}{Whether to enable reasoning mode.}
+
+\item{logprobs}{Whether to return log probabilities for output tokens.}
+
+\item{top_logprobs}{Optional number of most likely tokens to return at each
+position. Must be an integer from 0 through 20 and requires
+\code{logprobs = TRUE}.}
 
 \item{modalities}{Optional output modalities, for example \code{"text"} or
 \code{c("text", "image")}.}
