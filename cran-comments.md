@@ -8,6 +8,13 @@ in that R version's S3-registration subprocess, as it did for the previous
 release. Current R-devel checks are therefore also run through win-builder and
 R-hub.
 
+Additional checks:
+
+* R-hub R-devel passed on Linux, Windows, and macOS:
+  https://github.com/OliverLDS/inferencer/actions/runs/30815021557
+* The 0.2.0 source was accepted by win-builder R-devel; its result is delivered
+  asynchronously to the maintainer email.
+
 ## Submission notes
 
 This is an update to CRAN version 0.1.4.5.
