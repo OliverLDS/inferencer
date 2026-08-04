@@ -13,8 +13,12 @@ Author: Oliver Zhou [aut, cre]
 Maintainer: Oliver Zhou <oliver.yxzhou@gmail.com>
 Description: Provides lightweight R wrappers for querying and listing models
     from several hosted foundation model inference platforms, currently
-    including OpenAI, Google Gemini, Groq, OpenRouter, Cerebras, and Ollama
-    Cloud.
+    including 'OpenAI' <https://developers.openai.com/api/docs/>,
+    'Google Gemini' <https://ai.google.dev/gemini-api/docs>,
+    'Groq' <https://console.groq.com/docs/>,
+    'OpenRouter' <https://openrouter.ai/docs/>,
+    'Cerebras' <https://inference-docs.cerebras.ai/>, and
+    'Ollama Cloud' <https://docs.ollama.com/cloud>.
     The package is designed for simple inference workflows and quick
     experimentation, with minimal abstraction and a consistent interface
     across providers. It includes helper functions for model discovery, text

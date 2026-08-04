@@ -19,6 +19,10 @@ Additional checks:
 
 This is an update to CRAN version 0.1.4.5.
 
+This resubmission addresses CRAN's metadata request by single-quoting software
+and company names in `DESCRIPTION` and adding links to the providers' official
+documentation.
+
 Version 0.2.0 adds direct OpenAI Responses API and model-discovery wrappers,
 OpenRouter log-probability controls, buffered Groq SSE response assembly, and a
 shared internal transport for OpenAI-compatible chat endpoints. Provider-
