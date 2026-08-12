@@ -20,6 +20,7 @@
 #' @param speech_config Optional Gemini `speechConfig` object supplied as an R
 #'   list.
 #' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#' @param timeout Maximum number of seconds to wait for the HTTP request.
 #'
 #' @return A character string when Gemini returns text, a base64 string when the
 #'   first returned part is inline binary data, or the parsed JSON response when
@@ -31,7 +32,7 @@ query_gemini_content <- function(prompt = NULL, parts = NULL,
   url0 = Sys.getenv("GEMINI_API_URL", unset = "https://generativelanguage.googleapis.com/v1beta/models"),
   temperature = 0.7, top_p = 1, top_k = 40, max_tokens = NULL,
   response_modalities = NULL, speech_config = NULL,
-  json_list = FALSE) {
+  json_list = FALSE, timeout = 120) {
 
   content_parts <- .normalize_gemini_parts(prompt = prompt, parts = parts)
   .require_api_key(api_key, "GEMINI_API_KEY")
@@ -107,7 +108,8 @@ query_gemini_content <- function(prompt = NULL, parts = NULL,
   response <- .perform_json_request(
     url = url,
     headers = list(`Content-Type` = "application/json"),
-    body = body
+    body = body,
+    timeout = timeout
   )
   parsed_resp <- .parse_json_response(response)
   .stop_for_json_response(response, parsed_resp, "Gemini API request failed: ", NULL)
@@ -300,6 +302,7 @@ generate_image_gemini <- function(prompt,
 #'   `Sys.getenv("OPENROUTER_API_KEY")`.
 #' @param url OpenRouter chat completions endpoint.
 #' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#' @param timeout Maximum number of seconds to wait for the HTTP request.
 #'
 #' @return A character string by default when the assistant returns text, the
 #'   first image payload or URL when text is absent but images are returned, or
@@ -316,7 +319,7 @@ query_openrouter_content <- function(content,
   modalities = NULL,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset = "https://openrouter.ai/api/v1/chat/completions"),
-  json_list = FALSE) {
+  json_list = FALSE, timeout = 120) {
 
   content <- .normalize_openrouter_content(content)
   .require_api_key(api_key, "OPENROUTER_API_KEY")
@@ -399,7 +402,8 @@ query_openrouter_content <- function(content,
     ),
     parameters = parameters,
     stream = FALSE,
-    api_error_prefix = "OpenRouter API error"
+    api_error_prefix = "OpenRouter API error",
+    timeout = timeout
   )
 
   if (json_list) {

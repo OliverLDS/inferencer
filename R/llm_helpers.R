@@ -4,7 +4,30 @@
   }
 }
 
-.perform_json_request <- function(url, headers = NULL, body = NULL) {
+.validate_timeout <- function(timeout) {
+  if (!is.numeric(timeout) || length(timeout) != 1 || is.na(timeout) ||
+      !is.finite(timeout) || timeout <= 0) {
+    stop("`timeout` must be a single positive number of seconds.", call. = FALSE)
+  }
+
+  timeout
+}
+
+.redact_sensitive_text <- function(text, values = NULL) {
+  if (is.null(text)) return(NULL)
+  if (is.null(values)) return(text)
+
+  values <- unique(as.character(values))
+  values <- values[!is.na(values) & nchar(values) >= 8]
+  for (value in values) {
+    text <- gsub(value, "[REDACTED]", text, fixed = TRUE)
+  }
+
+  text
+}
+
+.perform_json_request <- function(url, headers = NULL, body = NULL, timeout = 120) {
+  timeout <- .validate_timeout(timeout)
   req <- httr2::request(url)
 
   if (!is.null(headers) && length(headers) > 0) {
@@ -13,6 +36,11 @@
 
   if (!is.null(body)) {
     req <- httr2::req_body_json(req, body, auto_unbox = TRUE)
+  }
+
+  # Mocked requests in unit tests are not httr2 request objects.
+  if (inherits(req, "httr2_request")) {
+    req <- httr2::req_timeout(req, seconds = timeout)
   }
 
   req |>
@@ -27,7 +55,8 @@
   provider,
   stream = FALSE,
   headers = NULL,
-  api_error_prefix = NULL
+  api_error_prefix = NULL,
+  timeout = 120
 ) {
   request_headers <- c(
     list(
@@ -40,7 +69,8 @@
   response <- .perform_json_request(
     url = url,
     headers = request_headers,
-    body = body
+    body = body,
+    timeout = timeout
   )
 
   if (httr2::resp_status(response) >= 300 || !stream) {
@@ -49,7 +79,8 @@
       response,
       parsed,
       paste0(provider, " API request failed: "),
-      api_error_prefix
+      api_error_prefix,
+      sensitive_values = api_key
     )
     return(parsed$json)
   }
@@ -68,7 +99,8 @@
   parameters = list(),
   stream = FALSE,
   headers = NULL,
-  api_error_prefix = NULL
+  api_error_prefix = NULL,
+  timeout = 120
 ) {
   body <- utils::modifyList(
     list(
@@ -86,7 +118,8 @@
     provider = provider,
     stream = stream,
     headers = headers,
-    api_error_prefix = api_error_prefix
+    api_error_prefix = api_error_prefix,
+    timeout = timeout
   )
 }
 
@@ -231,15 +264,21 @@
   NULL
 }
 
-.stop_for_json_response <- function(response, parsed, request_failed_prefix, api_error_prefix = NULL) {
+.stop_for_json_response <- function(
+  response,
+  parsed,
+  request_failed_prefix,
+  api_error_prefix = NULL,
+  sensitive_values = NULL
+) {
   if (httr2::resp_status(response) >= 300) {
-    msg <- .api_error_message(parsed$json)
+    msg <- .redact_sensitive_text(.api_error_message(parsed$json), sensitive_values)
 
     if (!is.null(msg) && !is.null(api_error_prefix)) {
       stop(sprintf("%s: %s", api_error_prefix, msg), call. = FALSE)
     }
 
-    stop(request_failed_prefix, parsed$text, call. = FALSE)
+    stop(request_failed_prefix, .redact_sensitive_text(parsed$text, sensitive_values), call. = FALSE)
   }
 
   if (!is.null(parsed$parse_error)) {
@@ -251,7 +290,7 @@
     )
   }
 
-  msg <- .api_error_message(parsed$json)
+  msg <- .redact_sensitive_text(.api_error_message(parsed$json), sensitive_values)
   if (!is.null(msg) && !is.null(api_error_prefix)) {
     stop(sprintf("%s: %s", api_error_prefix, msg), call. = FALSE)
   }

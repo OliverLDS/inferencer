@@ -13,6 +13,11 @@ It currently supports:
 - OpenRouter
 - Cerebras
 - Ollama Cloud
+- Qwen / Alibaba Cloud Model Studio
+- Zhipu AI
+- DeepSeek
+- Moonshot AI / Kimi
+- MiniMax
 
 The package is intentionally minimal. It focuses on a few common tasks:
 
@@ -40,6 +45,11 @@ Sys.setenv(GROQ_API_KEY = "your_key_here")
 Sys.setenv(OPENROUTER_API_KEY = "your_key_here")
 Sys.setenv(CEREBRAS_API_KEY = "your_key_here")
 Sys.setenv(OLLAMA_API_KEY = "your_key_here")
+Sys.setenv(DASHSCOPE_API_KEY = "your_key_here")
+Sys.setenv(ZHIPUAI_API_KEY = "your_key_here")
+Sys.setenv(DEEPSEEK_API_KEY = "your_key_here")
+Sys.setenv(MOONSHOT_API_KEY = "your_key_here")
+Sys.setenv(MINIMAX_API_KEY = "your_key_here")
 ```
 
 Load the package:
@@ -201,6 +211,21 @@ ollama_models <- list_ollama_models()
 head(ollama_models)
 ```
 
+### Providers Hosted in Mainland China
+
+```r
+qwen_models <- list_qwen_models()
+zhipu_models <- list_zhipu_models()
+deepseek_models <- list_deepseek_models()
+moonshot_models <- list_moonshot_models()
+minimax_models <- list_minimax_models()
+```
+
+Qwen and MiniMax accounts are region-specific. The defaults use their
+international endpoints; set `QWEN_MODELS_URL`, `QWEN_API_URL`,
+`MINIMAX_MODELS_URL`, and `MINIMAX_API_URL` when using a different account
+region, including mainland-China endpoints.
+
 ## Query models
 
 ### OpenAI
@@ -356,6 +381,37 @@ response <- query_openrouter(
 
 ```r
 query_fallback("Explain retrieval-augmented generation in plain English.")
+```
+
+### Providers Hosted in Mainland China
+
+```r
+query_qwen("Explain retrieval-augmented generation in plain English.")
+query_zhipu("Explain retrieval-augmented generation in plain English.")
+query_deepseek("Explain retrieval-augmented generation in plain English.")
+query_moonshot("Explain retrieval-augmented generation in plain English.")
+query_minimax("Explain retrieval-augmented generation in plain English.")
+```
+
+Use domestic-provider fallback when global provider APIs are unavailable from a
+given network. Its fixed order is Qwen, Zhipu, DeepSeek, Moonshot, then
+MiniMax. Each provider attempt has an independent timeout.
+
+```r
+query_china_fallback(
+  "Explain retrieval-augmented generation in plain English.",
+  timeout = 60
+)
+```
+
+`query_china_free_fallback()` never intentionally calls a paid model. At
+present, it uses only Zhipu's documented permanently free `glm-z1-flash`;
+`list_china_free_models()` exposes this curated policy. New-user promotional
+quotas from other providers are not included because they expire or are
+account-specific.
+
+```r
+query_china_free_fallback("Explain retrieval-augmented generation in plain English.")
 ```
 
 OpenRouter embeddings:

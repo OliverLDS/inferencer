@@ -16,7 +16,8 @@ query_openrouter(
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset =
     "https://openrouter.ai/api/v1/chat/completions"),
-  json_list = FALSE
+  json_list = FALSE,
+  timeout = 120
 )
 }
 \arguments{
@@ -44,6 +45,8 @@ position. Must be an integer from 0 through 20 and requires
 \item{url}{OpenRouter chat completions endpoint.}
 
 \item{json_list}{If \code{TRUE}, return the parsed JSON response as a list.}
+
+\item{timeout}{Maximum number of seconds to wait for the HTTP request.}
 }
 \value{
 A character string by default, or a parsed JSON list when

@@ -102,6 +102,7 @@ list_gemini_models <- function(api_key = Sys.getenv("GEMINI_API_KEY"), url = "ht
 #' @param speech_config Optional Gemini `speechConfig` object supplied as an R
 #'   list.
 #' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#' @param timeout Maximum number of seconds to wait for the HTTP request.
 #'
 #' @return A character string by default. For audio responses, returns the
 #'   base64-encoded audio data from `inlineData$data`. Returns the parsed JSON
@@ -112,7 +113,7 @@ query_gemini <- function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"),
   url0 = Sys.getenv("GEMINI_API_URL", unset = "https://generativelanguage.googleapis.com/v1beta/models"),
   temperature = 0.7, top_p = 1, top_k = 40, max_tokens = NULL, 
   response_modalities = NULL, speech_config = NULL,
-  json_list = FALSE) {
+  json_list = FALSE, timeout = 120) {
   query_gemini_content(
     prompt = prompt,
     api_key = api_key,
@@ -124,7 +125,8 @@ query_gemini <- function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"),
     max_tokens = max_tokens,
     response_modalities = response_modalities,
     speech_config = speech_config,
-    json_list = json_list
+    json_list = json_list,
+    timeout = timeout
   )
 }
 

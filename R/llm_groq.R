@@ -48,6 +48,7 @@ list_groq_models <- function(api_key = Sys.getenv("GROQ_API_KEY"), url = "https:
 #'   buffered and assembled before the function returns; tokens are not printed
 #'   incrementally to the terminal.
 #' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#' @param timeout Maximum number of seconds to wait for the HTTP request.
 #'
 #' @return A character string by default. With `json_list = TRUE`, returns a
 #'   parsed JSON response for non-streaming requests or a list of parsed SSE
@@ -57,7 +58,7 @@ query_groq <- function(prompt, api_key = Sys.getenv("GROQ_API_KEY"),
   url = Sys.getenv("GROQ_API_URL", unset = "https://api.groq.com/openai/v1/chat/completions"),
   model = c("groq/compound", "allam-2-7b", "groq/compound-mini", "qwen/qwen3-32b", "openai/gpt-oss-20b", "canopylabs/orpheus-v1-english", "openai/gpt-oss-120b", "whisper-large-v3", "llama-3.3-70b-versatile", "moonshotai/kimi-k2-instruct-0905", "whisper-large-v3-turbo", "meta-llama/llama-prompt-guard-2-86m", "moonshotai/kimi-k2-instruct", "meta-llama/llama-prompt-guard-2-22m", "meta-llama/llama-4-scout-17b-16e-instruct", "openai/gpt-oss-safeguard-20b", "llama-3.1-8b-instant", "canopylabs/orpheus-arabic-saudi"),
   temperature = 1.0, top_p = 1.0, max_tokens = 1024, 
-  stream = FALSE, json_list = FALSE) {
+  stream = FALSE, json_list = FALSE, timeout = 120) {
 
   if (!is.character(prompt) || length(prompt) != 1 || !nzchar(prompt)) {
     stop("`prompt` must be a non-empty character string.", call. = FALSE)
@@ -102,7 +103,8 @@ query_groq <- function(prompt, api_key = Sys.getenv("GROQ_API_KEY"),
       top_p = top_p,
       max_tokens = max_tokens
     ),
-    stream = stream
+    stream = stream,
+    timeout = timeout
   )
 
   if (json_list) return(parsed)

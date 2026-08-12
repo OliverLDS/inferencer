@@ -20,7 +20,8 @@ query_groq(
   top_p = 1,
   max_tokens = 1024,
   stream = FALSE,
-  json_list = FALSE
+  json_list = FALSE,
+  timeout = 120
 )
 }
 \arguments{
@@ -43,6 +44,8 @@ buffered and assembled before the function returns; tokens are not printed
 incrementally to the terminal.}
 
 \item{json_list}{If \code{TRUE}, return the parsed JSON response as a list.}
+
+\item{timeout}{Maximum number of seconds to wait for the HTTP request.}
 }
 \value{
 A character string by default. With \code{json_list = TRUE}, returns a

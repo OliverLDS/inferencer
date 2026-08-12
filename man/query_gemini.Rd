@@ -16,7 +16,8 @@ query_gemini(
   max_tokens = NULL,
   response_modalities = NULL,
   speech_config = NULL,
-  json_list = FALSE
+  json_list = FALSE,
+  timeout = 120
 )
 }
 \arguments{
@@ -43,6 +44,8 @@ query_gemini(
 list.}
 
 \item{json_list}{If \code{TRUE}, return the parsed JSON response as a list.}
+
+\item{timeout}{Maximum number of seconds to wait for the HTTP request.}
 }
 \value{
 A character string by default. For audio responses, returns the

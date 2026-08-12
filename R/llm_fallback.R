@@ -10,6 +10,7 @@
 #' @param api_key_openrouter OpenRouter API key. Defaults to
 #'   `Sys.getenv("OPENROUTER_API_KEY")`.
 #' @param api_key_groq Groq API key. Defaults to `Sys.getenv("GROQ_API_KEY")`.
+#' @param timeout Maximum number of seconds to wait for each provider request.
 #'
 #' @return A character string by default. When `json_list = TRUE`, returns a
 #'   list with elements `provider` and `response`.
@@ -19,9 +20,11 @@ query_fallback <- function(
   json_list = FALSE,
   api_key_gemini = Sys.getenv("GEMINI_API_KEY"),
   api_key_openrouter = Sys.getenv("OPENROUTER_API_KEY"),
-  api_key_groq = Sys.getenv("GROQ_API_KEY")
+  api_key_groq = Sys.getenv("GROQ_API_KEY"),
+  timeout = 120
 ) {
   .validate_non_empty_string(prompt, "prompt")
+  timeout <- .validate_timeout(timeout)
 
   attempts <- list(
     list(
@@ -30,7 +33,8 @@ query_fallback <- function(
         query_gemini(
           prompt = prompt,
           api_key = api_key_gemini,
-          json_list = json_list
+          json_list = json_list,
+          timeout = timeout
         )
       }
     ),
@@ -40,7 +44,8 @@ query_fallback <- function(
         query_openrouter(
           prompt = prompt,
           api_key = api_key_openrouter,
-          json_list = json_list
+          json_list = json_list,
+          timeout = timeout
         )
       }
     ),
@@ -50,7 +55,8 @@ query_fallback <- function(
         query_groq(
           prompt = prompt,
           api_key = api_key_groq,
-          json_list = json_list
+          json_list = json_list,
+          timeout = timeout
         )
       }
     )

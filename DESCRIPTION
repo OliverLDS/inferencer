@@ -1,7 +1,7 @@
 Package: inferencer
 Type: Package
 Title: Simple Unified Wrappers for Hosted Foundation Model Inference APIs
-Version: 0.2.0
+Version: 0.2.1
 Authors@R: 
     person(
       given = "Oliver",
@@ -17,8 +17,13 @@ Description: Provides lightweight R wrappers for querying and listing models
     'Google Gemini' <https://ai.google.dev/gemini-api/docs>,
     'Groq' <https://console.groq.com/docs/>,
     'OpenRouter' <https://openrouter.ai/docs/>,
-    'Cerebras' <https://inference-docs.cerebras.ai/>, and
-    'Ollama Cloud' <https://docs.ollama.com/cloud>.
+    'Cerebras' <https://inference-docs.cerebras.ai/>,
+    'Ollama Cloud' <https://docs.ollama.com/cloud>,
+    'Alibaba Cloud Model Studio' <https://help.aliyun.com/en/model-studio/>,
+    'Zhipu AI' <https://docs.bigmodel.cn/>,
+    'DeepSeek' <https://api-docs.deepseek.com/>,
+    'Moonshot AI' <https://platform.kimi.ai/docs/>, and
+    'MiniMax' <https://platform.minimax.io/docs/>.
     The package is designed for simple inference workflows and quick
     experimentation, with minimal abstraction and a consistent interface
     across providers. It includes helper functions for model discovery, text

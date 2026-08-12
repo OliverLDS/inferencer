@@ -9,7 +9,8 @@ query_fallback(
   json_list = FALSE,
   api_key_gemini = Sys.getenv("GEMINI_API_KEY"),
   api_key_openrouter = Sys.getenv("OPENROUTER_API_KEY"),
-  api_key_groq = Sys.getenv("GROQ_API_KEY")
+  api_key_groq = Sys.getenv("GROQ_API_KEY"),
+  timeout = 120
 )
 }
 \arguments{
@@ -24,6 +25,8 @@ name and parsed response object.}
 \code{Sys.getenv("OPENROUTER_API_KEY")}.}
 
 \item{api_key_groq}{Groq API key. Defaults to \code{Sys.getenv("GROQ_API_KEY")}.}
+
+\item{timeout}{Maximum number of seconds to wait for each provider request.}
 }
 \value{
 A character string by default. When \code{json_list = TRUE}, returns a

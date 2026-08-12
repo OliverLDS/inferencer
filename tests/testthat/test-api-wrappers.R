@@ -54,6 +54,36 @@ test_that("query_gemini returns text and validates prompt", {
   expect_error(query_gemini("hello", api_key = "key", top_k = 0), "`top_k` must be a single positive integer.")
 })
 
+test_that("query_gemini passes timeout to the shared HTTP request layer", {
+  captured_timeout <- NULL
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = c("httr2_request", "request")),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_timeout = function(req, seconds) {
+      captured_timeout <<- seconds
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(
+          status = 200L,
+          body = '{"candidates":[{"content":{"parts":[{"text":"Gemini reply"}]}}]}'
+        ),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_equal(query_gemini("hello", api_key = "key", timeout = 7.5), "Gemini reply")
+  expect_equal(captured_timeout, 7.5)
+  expect_error(query_gemini("hello", api_key = "key", timeout = 0), "positive number")
+})
+
 test_that("query_gemini_content accepts explicit multimodal parts", {
   testthat::local_mocked_bindings(
     request = function(url) structure(list(url = url), class = "request"),
@@ -298,6 +328,31 @@ test_that("OpenAI-compatible wrappers handle non-JSON HTTP errors", {
     "Cerebras API request failed: <html>service unavailable</html>",
     fixed = TRUE
   )
+})
+
+test_that("OpenAI-compatible wrappers redact reflected API keys in errors", {
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(status = 401L, body = '{"error":{"message":"invalid key secret-key"}}'),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  error <- tryCatch(
+    query_zhipu("hello", api_key = "secret-key"),
+    error = function(error) error
+  )
+  expect_match(conditionMessage(error), "[REDACTED]", fixed = TRUE)
+  expect_false(grepl("secret-key", conditionMessage(error), fixed = TRUE))
 })
 
 test_that("query_groq parses streaming SSE responses", {
@@ -1007,7 +1062,7 @@ test_that("query_fallback returns the first successful provider response", {
 test_that("query_fallback reports all provider failures", {
   testthat::local_mocked_bindings(
     query_gemini = function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"), json_list = FALSE, ...) {
-      stop("Gemini down", call. = FALSE)
+      stop("Timeout was reached after 120 seconds", call. = FALSE)
     },
     query_openrouter = function(prompt, api_key = Sys.getenv("OPENROUTER_API_KEY"), json_list = FALSE, ...) {
       stop("OpenRouter down", call. = FALSE)
@@ -1024,7 +1079,7 @@ test_that("query_fallback reports all provider failures", {
   )
   expect_error(
     query_fallback("hello"),
-    "gemini: Gemini down"
+    "gemini: Timeout was reached after 120 seconds"
   )
   expect_error(
     query_fallback("hello"),
@@ -1034,6 +1089,103 @@ test_that("query_fallback reports all provider failures", {
     query_fallback("hello"),
     "groq: Groq down"
   )
+})
+
+test_that("query_fallback continues after a provider timeout", {
+  calls <- character()
+  timeouts <- numeric()
+  testthat::local_mocked_bindings(
+    query_gemini = function(prompt, api_key = Sys.getenv("GEMINI_API_KEY"), json_list = FALSE, timeout = 120, ...) {
+      calls <<- c(calls, "gemini")
+      timeouts <<- c(timeouts, timeout)
+      stop("Timeout was reached after 3 seconds", call. = FALSE)
+    },
+    query_openrouter = function(prompt, api_key = Sys.getenv("OPENROUTER_API_KEY"), json_list = FALSE, timeout = 120, ...) {
+      calls <<- c(calls, "openrouter")
+      timeouts <<- c(timeouts, timeout)
+      "OpenRouter reply"
+    },
+    query_groq = function(prompt, api_key = Sys.getenv("GROQ_API_KEY"), json_list = FALSE, timeout = 120, ...) {
+      calls <<- c(calls, "groq")
+      stop("Groq should not be called", call. = FALSE)
+    },
+    .package = "inferencer"
+  )
+
+  expect_equal(query_fallback("hello", timeout = 3), "OpenRouter reply")
+  expect_equal(calls, c("gemini", "openrouter"))
+  expect_equal(timeouts, c(3, 3))
+})
+
+test_that("mainland-China provider wrappers list models and query text", {
+  captured <- list()
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      captured[[req$url]] <<- body
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      body <- if (grepl("/models$", req$url)) {
+        '{"object":"list","data":[{"id":"model-a","owned_by":"provider"}]}'
+      } else {
+        '{"choices":[{"message":{"content":"Provider reply"}}]}'
+      }
+      structure(list(status = 200L, body = body), class = "httr2_response")
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  providers <- list(
+    list(list_fn = "list_qwen_models", query_fn = "query_qwen", key = "key", url = "https://example.com/qwen"),
+    list(list_fn = "list_zhipu_models", query_fn = "query_zhipu", key = "key", url = "https://example.com/zhipu"),
+    list(list_fn = "list_deepseek_models", query_fn = "query_deepseek", key = "key", url = "https://example.com/deepseek"),
+    list(list_fn = "list_moonshot_models", query_fn = "query_moonshot", key = "key", url = "https://example.com/moonshot"),
+    list(list_fn = "list_minimax_models", query_fn = "query_minimax", key = "key", url = "https://example.com/minimax")
+  )
+
+  for (provider in providers) {
+    models <- do.call(provider$list_fn, list(api_key = provider$key, url = paste0(provider$url, "/models")))
+    expect_s3_class(models, "data.table")
+    expect_equal(models$id, "model-a")
+
+    reply <- do.call(provider$query_fn, list(
+      prompt = "hello", api_key = provider$key, url = paste0(provider$url, "/chat/completions"),
+      model = "model-a"
+    ))
+    expect_equal(reply, "Provider reply")
+    expect_equal(captured[[paste0(provider$url, "/chat/completions")]]$model, "model-a")
+  }
+})
+
+test_that("China fallbacks preserve their documented provider policies", {
+  calls <- character()
+  testthat::local_mocked_bindings(
+    query_qwen = function(...) { calls <<- c(calls, "qwen"); stop("Qwen down", call. = FALSE) },
+    query_zhipu = function(..., model = "glm-5") {
+      calls <<- c(calls, paste0("zhipu:", model))
+      "Zhipu reply"
+    },
+    query_deepseek = function(...) { calls <<- c(calls, "deepseek"); "DeepSeek reply" },
+    query_moonshot = function(...) { calls <<- c(calls, "moonshot"); "Moonshot reply" },
+    query_minimax = function(...) { calls <<- c(calls, "minimax"); "MiniMax reply" },
+    .package = "inferencer"
+  )
+
+  expect_equal(query_china_fallback("hello"), "Zhipu reply")
+  expect_equal(calls, c("qwen", "zhipu:glm-5"))
+
+  calls <- character()
+  expect_equal(query_china_free_fallback("hello"), "Zhipu reply")
+  expect_equal(calls, "zhipu:glm-z1-flash")
+
+  free_models <- list_china_free_models()
+  expect_s3_class(free_models, "data.table")
+  expect_equal(free_models$model, "glm-z1-flash")
 })
 
 test_that("query_openrouter_content parses text blocks and catches truncation", {

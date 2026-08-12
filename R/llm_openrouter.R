@@ -393,6 +393,7 @@ extract_openrouter_benchmarks <- function(
 #'   `Sys.getenv("OPENROUTER_API_KEY")`.
 #' @param url OpenRouter chat completions endpoint.
 #' @param json_list If `TRUE`, return the parsed JSON response as a list.
+#' @param timeout Maximum number of seconds to wait for the HTTP request.
 #'
 #' @return A character string by default, or a parsed JSON list when
 #'   `json_list = TRUE`.
@@ -408,7 +409,8 @@ query_openrouter <- function(
   top_logprobs = NULL,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset = "https://openrouter.ai/api/v1/chat/completions"),
-  json_list = FALSE
+  json_list = FALSE,
+  timeout = 120
 ) {
   query_openrouter_content(
     content = prompt,
@@ -421,6 +423,7 @@ query_openrouter <- function(
     top_logprobs = top_logprobs,
     api_key = api_key,
     url = url,
-    json_list = json_list
+    json_list = json_list,
+    timeout = timeout
   )
 }

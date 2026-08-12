@@ -1,3 +1,17 @@
+# inferencer 0.2.1
+
+- Added text-query and model-list wrappers for Qwen, Zhipu, DeepSeek, Moonshot,
+  and MiniMax.
+- Added `query_china_fallback()` for ordered fallback across providers hosted
+  in mainland China.
+- Added `list_china_free_models()` and `query_china_free_fallback()`, which
+  currently use only Zhipu's documented permanently free API model instead of
+  treating account-specific trials as universally free.
+- Added configurable per-request timeouts, defaulting to 120 seconds, to the
+  Gemini, OpenRouter, Groq, and standard fallback query helpers.
+- Redacted API keys from compatible-provider error messages when a provider
+  reflects credentials in its response body.
+
 # inferencer 0.2.0
 
 - Added direct OpenAI Responses API support through `query_openai()` and model
