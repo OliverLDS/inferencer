@@ -38,6 +38,7 @@ responses, and live-provider smoke tests require an explicit opt-in environment
 variable, so CRAN checks do not depend on external services, API keys, quotas,
 or network availability.
 
-The package also ships optional `zsh` command-line helper scripts under
-`inst/shell`. These scripts are not required for R package functionality and
-depend on external `zsh`, `curl`, and `jq` commands when users run them.
+The package also ships optional command-line helper scripts under `inst/shell`.
+They are not required for R package functionality. The zsh scripts depend on
+external `zsh`, `curl`, and `jq` commands, while the local-model Node.js script
+requires Node.js 18 or later when users run them.

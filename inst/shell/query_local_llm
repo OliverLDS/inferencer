@@ -1,0 +1,166 @@
+#!/usr/bin/env node
+
+"use strict";
+
+const usage = `Usage: query_local_llm [options] "prompt" [model]
+
+Options:
+  --json                    Print the full JSON response.
+  --system TEXT             Add a system message.
+  --temperature NUMBER      Set sampling temperature.
+  --max-tokens NUMBER       Set the maximum number of output tokens.
+  --response-format JSON    Set an OpenAI-compatible response_format object.
+  --timeout SECONDS         Set the request timeout (default: 120).
+  -h, --help                Show this help message.
+
+Environment:
+  LOCAL_LLM_API_URL               Chat endpoint (default: http://127.0.0.1:8080/v1/chat/completions)
+  LOCAL_LLM_API_KEY               Optional bearer token.
+  LOCAL_LLM_MODEL                 Default model (default: Qwen3-0.6B-Q4_0).
+  LOCAL_LLM_TEMPERATURE           Default temperature.
+  LOCAL_LLM_MAX_TOKENS            Default maximum output tokens.
+  LOCAL_LLM_RESPONSE_FORMAT       Default response_format JSON object.
+  LOCAL_LLM_TIMEOUT               Default request timeout in seconds.
+`;
+
+function fail(message) {
+  process.stderr.write(`Error: ${message}\n`);
+  process.exit(1);
+}
+
+function parseNumber(value, name) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) fail(`${name} must be a finite number.`);
+  return number;
+}
+
+function parsePositiveInteger(value, name) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 1) {
+    fail(`${name} must be a positive integer.`);
+  }
+  return number;
+}
+
+function parseJsonObject(value, name) {
+  let parsed;
+  try {
+    parsed = JSON.parse(value);
+  } catch (error) {
+    fail(`${name} must be valid JSON: ${error.message}`);
+  }
+  if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object") {
+    fail(`${name} must be a JSON object.`);
+  }
+  return parsed;
+}
+
+const args = process.argv.slice(2);
+const options = {
+  json: false,
+  system: null,
+  temperature: process.env.LOCAL_LLM_TEMPERATURE ?? null,
+  maxTokens: process.env.LOCAL_LLM_MAX_TOKENS ?? null,
+  responseFormat: process.env.LOCAL_LLM_RESPONSE_FORMAT ?? null,
+  timeout: process.env.LOCAL_LLM_TIMEOUT ?? "120",
+};
+const positional = [];
+
+for (let index = 0; index < args.length; index += 1) {
+  const argument = args[index];
+  if (argument === "--help" || argument === "-h") {
+    process.stdout.write(usage);
+    process.exit(0);
+  }
+  if (argument === "--json") {
+    options.json = true;
+    continue;
+  }
+  if (["--system", "--temperature", "--max-tokens", "--response-format", "--timeout"].includes(argument)) {
+    const value = args[index + 1];
+    if (value === undefined) fail(`${argument} requires a value.`);
+    index += 1;
+    if (argument === "--system") options.system = value;
+    if (argument === "--temperature") options.temperature = value;
+    if (argument === "--max-tokens") options.maxTokens = value;
+    if (argument === "--response-format") options.responseFormat = value;
+    if (argument === "--timeout") options.timeout = value;
+    continue;
+  }
+  if (argument.startsWith("-")) fail(`unknown option '${argument}'.`);
+  positional.push(argument);
+}
+
+if (positional.length < 1 || positional.length > 2) {
+  process.stderr.write(usage);
+  process.exit(1);
+}
+
+const prompt = positional[0];
+const model = positional[1] ?? process.env.LOCAL_LLM_MODEL ?? "Qwen3-0.6B-Q4_0";
+
+const body = {
+  model,
+  messages: [{ role: "user", content: prompt }],
+  stream: false,
+};
+if (options.system !== null) body.messages.unshift({ role: "system", content: options.system });
+if (options.temperature !== null) body.temperature = parseNumber(options.temperature, "temperature");
+if (options.maxTokens !== null) body.max_tokens = parsePositiveInteger(options.maxTokens, "max-tokens");
+if (options.responseFormat !== null) {
+  body.response_format = parseJsonObject(options.responseFormat, "response-format");
+}
+
+const timeoutSeconds = parsePositiveInteger(options.timeout, "timeout");
+
+const url = process.env.LOCAL_LLM_API_URL ?? "http://127.0.0.1:8080/v1/chat/completions";
+const headers = { "Content-Type": "application/json" };
+if (process.env.LOCAL_LLM_API_KEY) {
+  headers.Authorization = `Bearer ${process.env.LOCAL_LLM_API_KEY}`;
+}
+
+async function main() {
+  let response;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      fail(`request to ${url} timed out after ${timeoutSeconds} seconds.`);
+    }
+    fail(`request to ${url} failed: ${error.message}`);
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const text = await response.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch (error) {
+    fail(`server returned invalid JSON (HTTP ${response.status}): ${text}`);
+  }
+
+  if (!response.ok) {
+    const message = json?.error?.message ?? json?.message ?? text;
+    fail(`server returned HTTP ${response.status}: ${message}`);
+  }
+  if (options.json) {
+    process.stdout.write(`${JSON.stringify(json, null, 2)}\n`);
+    return;
+  }
+
+  const content = json?.choices?.[0]?.message?.content;
+  if (typeof content !== "string" || content.length === 0) {
+    fail("server returned no choices[0].message.content; rerun with --json to inspect the response.");
+  }
+  process.stdout.write(`${content}\n`);
+}
+
+main();

@@ -100,6 +100,7 @@ The shell layer currently includes query helpers, model-listing helpers, and a
 terminal markdown renderer:
 
 - `query_gemini`, `query_groq`, `query_openrouter`, `query_ollama`, `query_fallback`
+- `query_local_llm` for a local model server
 - `list_gemini_models`, `list_groq_models`, `list_openrouter_models`, `list_openrouter_free_models`, `list_ollama_models`
 - `render_markdown_terminal`
 
@@ -108,6 +109,26 @@ Run scripts from the repo:
 ```sh
 inst/shell/query_openrouter "Summarize retrieval-augmented generation."
 ```
+
+`query_local_llm` is a Node.js 18+ script. It targets a local server's
+OpenAI-compatible chat endpoint at `http://127.0.0.1:8080` by default and uses
+`Qwen3-0.6B-Q4_0` unless a model is supplied. It accepts generic request
+options:
+
+```sh
+inst/shell/query_local_llm \
+  --system "Return a JSON object only." \
+  --temperature 0 \
+  --max-tokens 120 \
+  --timeout 120 \
+  --response-format '{"type":"json_object"}' \
+  "Define meticulous." \
+  "Qwen3-0.6B-Q4_0"
+```
+
+Use `LOCAL_LLM_API_URL`, `LOCAL_LLM_API_KEY`, `LOCAL_LLM_MODEL`, and
+`LOCAL_LLM_TIMEOUT` to change its endpoint, optional authentication, model
+default, or request timeout. Pass `--json` to print the full server response.
 
 Or add the installed shell directory to `PATH`:
 

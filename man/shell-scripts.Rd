@@ -5,10 +5,11 @@
 \title{Shell Script Helpers}
 \description{
 inferencer also ships a small optional shell layer under \code{inst/shell}.
-These scripts are executable \code{zsh} command-line helpers that mirror common
-R wrapper workflows:
+These scripts are executable command-line helpers that mirror common R
+wrapper workflows:
 \code{query_gemini}, \code{query_groq}, \code{query_openrouter}, \code{query_ollama},
-\code{query_fallback}, provider-specific \verb{list_*_models} scripts, and
+\code{query_fallback}, \code{query_local_llm} (a Node.js helper for a local model
+server), provider-specific \verb{list_*_models} scripts, and
 \code{render_markdown_terminal}.
 }
 \details{
@@ -17,10 +18,12 @@ variables, typically configured in \code{.zprofile}. The variable names are
 aligned with the R wrappers, such as \code{GEMINI_API_KEY}, \code{GROQ_API_KEY},
 \code{OPENROUTER_API_KEY}, and \code{OLLAMA_API_KEY}.
 
-They are intentionally minimal and depend on external \code{curl} and \code{jq}
-binaries. Query scripts print the model response text by default and return
-the full parsed JSON payload when called with \code{--json}. Pipe query output to
-\code{render_markdown_terminal} when terminal markdown rendering is desired.
+The zsh scripts are intentionally minimal and depend on external \code{curl} and
+\code{jq} binaries. \code{query_local_llm} requires Node.js 18 or later and
+uses its built-in \code{fetch}. Query scripts print the model response text by
+default and return the full parsed JSON payload when called with \code{--json}.
+Pipe query output to \code{render_markdown_terminal} when terminal markdown
+rendering is desired.
 \code{query_fallback} tries \code{query_gemini}, then \code{query_openrouter}, then
 \code{query_groq} using each script's default model.
 }
