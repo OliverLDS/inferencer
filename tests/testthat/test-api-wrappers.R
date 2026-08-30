@@ -24,6 +24,110 @@ test_that("list_gemini_models returns a data table or json list", {
   expect_equal(json$models[[1]]$displayName, "Gemini 2.5 Flash")
 })
 
+test_that("list_openai_compatible_models supports unauthenticated local servers", {
+  captured_url <- NULL
+  testthat::local_mocked_bindings(
+    request = function(url) {
+      captured_url <<- url
+      structure(list(url = url), class = "request")
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(status = 200L, body = '{"data":[{"id":"local-model","object":"model"}]}'),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  models <- list_openai_compatible_models()
+  expect_s3_class(models, "data.table")
+  expect_equal(models$id[[1]], "local-model")
+  expect_equal(captured_url, "http://127.0.0.1:8080/v1/models")
+
+  json <- list_openai_compatible_models(json_list = TRUE)
+  expect_equal(json$data[[1]]$id, "local-model")
+})
+
+test_that("query_openai_compatible forwards schema output without authentication", {
+  captured_body <- NULL
+  captured_headers <- NULL
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) {
+      captured_headers <<- list(...)
+      req
+    },
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      captured_body <<- body
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(status = 200L, body = '{"choices":[{"message":{"content":"{\\"word\\":\\"meticulous\\"}"}}]}'),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  response_format <- list(
+    type = "json_schema",
+    json_schema = list(name = "entry", strict = TRUE, schema = list(type = "object"))
+  )
+  reply <- query_openai_compatible(
+    prompt = "Define meticulous.",
+    model = "Qwen3-0.6B",
+    system = "Return JSON only.",
+    response_format = response_format,
+    temperature = 0,
+    max_tokens = 120
+  )
+
+  expect_equal(reply, '{"word":"meticulous"}')
+  expect_equal(captured_body$model, "Qwen3-0.6B")
+  expect_equal(captured_body$messages[[1]], list(role = "system", content = "Return JSON only."))
+  expect_equal(captured_body$response_format, response_format)
+  expect_equal(captured_body$temperature, 0)
+  expect_equal(captured_body$max_tokens, 120L)
+  expect_false("Authorization" %in% names(captured_headers))
+  expect_equal(captured_headers[["Content-Type"]], "application/json")
+
+  expect_error(query_openai_compatible("hello", "model", response_format = "json"), "must be NULL or a list")
+  expect_error(query_openai_compatible("hello", "model", api_key = ""), "api_key")
+})
+
+test_that("query_openai_compatible sends an optional bearer token", {
+  captured_headers <- NULL
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) {
+      captured_headers <<- list(...)
+      req
+    },
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(status = 200L, body = '{"choices":[{"message":{"content":"ok"}}]}'),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_equal(query_openai_compatible("hello", "model", api_key = "test-token"), "ok")
+  expect_equal(captured_headers[["Authorization"]], "Bearer test-token")
+})
+
 test_that("query_gemini returns text and validates prompt", {
   testthat::local_mocked_bindings(
     request = function(url) structure(list(url = url), class = "request"),

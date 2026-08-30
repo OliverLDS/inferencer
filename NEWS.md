@@ -1,3 +1,11 @@
+# inferencer 0.2.2
+
+- Added generic `list_openai_compatible_models()` and
+  `query_openai_compatible()` wrappers for local and self-hosted
+  OpenAI-compatible model servers. They support optional bearer authentication
+  and pass through JSON-schema response formats.
+- Updated package scope documentation to include local model inference.
+
 # inferencer 0.2.1
 
 - Added text-query and model-list wrappers for Qwen, Zhipu, DeepSeek, Moonshot,

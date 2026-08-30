@@ -1,7 +1,7 @@
 Package: inferencer
 Type: Package
-Title: Simple Unified Wrappers for Hosted Foundation Model Inference APIs
-Version: 0.2.1
+Title: Simple Unified Wrappers for Foundation Model Inference APIs
+Version: 0.2.2
 Authors@R: 
     person(
       given = "Oliver",
@@ -12,7 +12,7 @@ Authors@R:
 Author: Oliver Zhou [aut, cre]
 Maintainer: Oliver Zhou <oliver.yxzhou@gmail.com>
 Description: Provides lightweight R wrappers for querying and listing models
-    from several hosted foundation model inference platforms, currently
+    from several hosted and local foundation model inference platforms, currently
     including 'OpenAI' <https://developers.openai.com/api/docs/>,
     'Google Gemini' <https://ai.google.dev/gemini-api/docs>,
     'Groq' <https://console.groq.com/docs/>,

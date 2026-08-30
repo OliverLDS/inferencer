@@ -4,6 +4,12 @@
   }
 }
 
+.validate_optional_api_key <- function(api_key) {
+  if (is.null(api_key)) return(invisible(NULL))
+  .validate_non_empty_string(api_key, "api_key")
+  invisible(NULL)
+}
+
 .validate_timeout <- function(timeout) {
   if (!is.numeric(timeout) || length(timeout) != 1 || is.na(timeout) ||
       !is.finite(timeout) || timeout <= 0) {
@@ -58,13 +64,11 @@
   api_error_prefix = NULL,
   timeout = 120
 ) {
-  request_headers <- c(
-    list(
-      "Content-Type" = "application/json",
-      "Authorization" = paste("Bearer", api_key)
-    ),
-    headers
-  )
+  request_headers <- list("Content-Type" = "application/json")
+  if (!is.null(api_key)) {
+    request_headers$Authorization <- paste("Bearer", api_key)
+  }
+  request_headers <- c(request_headers, headers)
 
   response <- .perform_json_request(
     url = url,

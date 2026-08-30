@@ -1,9 +1,9 @@
 # inferencer
 
-`inferencer` is a lightweight R package for calling hosted foundation model
-inference APIs through a simple and mostly consistent interface. It also ships
-with a small shell companion for the same providers when you want terminal
-usage without writing R code.
+`inferencer` is a lightweight R package for calling hosted and local foundation
+model inference APIs through a simple and mostly consistent interface. It also
+ships with a small shell companion for selected hosted providers when you want
+terminal usage without writing R code.
 
 It currently supports:
 
@@ -57,6 +57,38 @@ Load the package:
 ```r
 library(inferencer)
 ```
+
+## Local OpenAI-Compatible Servers
+
+`query_openai_compatible()` and `list_openai_compatible_models()` support any
+local or self-hosted server that implements OpenAI-compatible `/v1/models` and
+`/v1/chat/completions` endpoints, including `llama.cpp`, vLLM, LM Studio, and
+LocalAI. Their defaults target an unauthenticated server on
+`http://127.0.0.1:8080`; no model runtime, launch command, or model path is
+bundled with this package.
+
+```r
+local_models <- list_openai_compatible_models()
+
+reply <- query_openai_compatible(
+  prompt = "Define meticulous.",
+  system = "Return JSON only.",
+  model = "Qwen3-0.6B",
+  response_format = list(
+    type = "json_schema",
+    json_schema = list(
+      name = "vocabulary_entry",
+      strict = TRUE,
+      schema = list(type = "object")
+    )
+  ),
+  temperature = 0,
+  max_tokens = 120
+)
+```
+
+Supply `api_key` for a protected deployment, or override `url` when the server
+uses another address or port.
 
 ## Shell scripts
 
