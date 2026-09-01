@@ -13,6 +13,8 @@ query_openrouter(
   reasoning = TRUE,
   logprobs = FALSE,
   top_logprobs = NULL,
+  auto_router_cost_tier = NULL,
+  session_id = NULL,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset =
     "https://openrouter.ai/api/v1/chat/completions"),
@@ -38,6 +40,13 @@ query_openrouter(
 \item{top_logprobs}{Optional number of most likely tokens to return at each
 position. Must be an integer from 0 through 20 and requires
 \code{logprobs = TRUE}.}
+
+\item{auto_router_cost_tier}{Optional OpenRouter Auto Router cost tier:
+\code{"low"}, \code{"medium"}, \code{"high"}, \code{"xhigh"}, or \code{"max"}. Applies when
+\code{model = "openrouter/auto"}.}
+
+\item{session_id}{Optional OpenRouter session identifier for preserving
+model selection across related requests.}
 
 \item{api_key}{OpenRouter API key. Defaults to
 \code{Sys.getenv("OPENROUTER_API_KEY")}.}

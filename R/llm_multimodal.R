@@ -296,6 +296,11 @@ generate_image_gemini <- function(prompt,
 #' @param top_logprobs Optional number of most likely tokens to return at each
 #'   position. Must be an integer from 0 through 20 and requires
 #'   `logprobs = TRUE`.
+#' @param auto_router_cost_tier Optional OpenRouter Auto Router cost tier:
+#'   `"low"`, `"medium"`, `"high"`, `"xhigh"`, or `"max"`. Applies when
+#'   `model = "openrouter/auto"`.
+#' @param session_id Optional OpenRouter session identifier for preserving
+#'   model selection across related requests.
 #' @param modalities Optional output modalities, for example `"text"` or
 #'   `c("text", "image")`.
 #' @param api_key OpenRouter API key. Defaults to
@@ -316,6 +321,8 @@ query_openrouter_content <- function(content,
   reasoning = TRUE,
   logprobs = FALSE,
   top_logprobs = NULL,
+  auto_router_cost_tier = NULL,
+  session_id = NULL,
   modalities = NULL,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset = "https://openrouter.ai/api/v1/chat/completions"),
@@ -363,6 +370,17 @@ query_openrouter_content <- function(content,
     top_logprobs <- as.integer(top_logprobs)
   }
 
+  if (!is.null(auto_router_cost_tier)) {
+    if (!is.character(auto_router_cost_tier) || length(auto_router_cost_tier) != 1 ||
+        is.na(auto_router_cost_tier) || !auto_router_cost_tier %in% c("low", "medium", "high", "xhigh", "max")) {
+      stop("`auto_router_cost_tier` must be NULL or one of `low`, `medium`, `high`, `xhigh`, or `max`.", call. = FALSE)
+    }
+  }
+
+  if (!is.null(session_id)) {
+    .validate_non_empty_string(session_id, "session_id")
+  }
+
   if (!is.null(modalities)) {
     if (!is.character(modalities) || length(modalities) < 1 || any(!nzchar(modalities))) {
       stop("`modalities` must be a non-empty character vector or NULL.", call. = FALSE)
@@ -387,6 +405,17 @@ query_openrouter_content <- function(content,
 
   if (!is.null(top_logprobs)) {
     parameters$top_logprobs <- top_logprobs
+  }
+
+  if (!is.null(auto_router_cost_tier)) {
+    parameters$plugins <- list(list(
+      id = "auto-router",
+      cost_tier = auto_router_cost_tier
+    ))
+  }
+
+  if (!is.null(session_id)) {
+    parameters$session_id <- session_id
   }
 
   json <- .openai_compatible_chat_request(

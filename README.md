@@ -419,6 +419,22 @@ query_openrouter(
 )
 ```
 
+Use OpenRouter's task-aware Auto Router explicitly when paid routing is
+acceptable. `auto_router_cost_tier` selects its cost band, while `session_id`
+helps related requests retain the selected model:
+
+```r
+query_openrouter(
+  prompt = "Summarize the first section of this report.",
+  model = "openrouter/auto",
+  auto_router_cost_tier = "low",
+  session_id = "report-summary-2026-09"
+)
+```
+
+The default remains `openrouter/free`; Auto Router bills at the selected
+model's rate. Use `json_list = TRUE` to inspect the response `model` field.
+
 Request token log probabilities and retain the complete response:
 
 ```r

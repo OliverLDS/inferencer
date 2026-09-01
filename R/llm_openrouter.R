@@ -389,6 +389,11 @@ extract_openrouter_benchmarks <- function(
 #' @param top_logprobs Optional number of most likely tokens to return at each
 #'   position. Must be an integer from 0 through 20 and requires
 #'   `logprobs = TRUE`.
+#' @param auto_router_cost_tier Optional OpenRouter Auto Router cost tier:
+#'   `"low"`, `"medium"`, `"high"`, `"xhigh"`, or `"max"`. Applies when
+#'   `model = "openrouter/auto"`.
+#' @param session_id Optional OpenRouter session identifier for preserving
+#'   model selection across related requests.
 #' @param api_key OpenRouter API key. Defaults to
 #'   `Sys.getenv("OPENROUTER_API_KEY")`.
 #' @param url OpenRouter chat completions endpoint.
@@ -407,6 +412,8 @@ query_openrouter <- function(
   reasoning = TRUE,
   logprobs = FALSE,
   top_logprobs = NULL,
+  auto_router_cost_tier = NULL,
+  session_id = NULL,
   api_key = Sys.getenv("OPENROUTER_API_KEY"),
   url = Sys.getenv("OPENROUTER_API_URL", unset = "https://openrouter.ai/api/v1/chat/completions"),
   json_list = FALSE,
@@ -421,6 +428,8 @@ query_openrouter <- function(
     reasoning = reasoning,
     logprobs = logprobs,
     top_logprobs = top_logprobs,
+    auto_router_cost_tier = auto_router_cost_tier,
+    session_id = session_id,
     api_key = api_key,
     url = url,
     json_list = json_list,

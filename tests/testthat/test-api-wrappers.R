@@ -914,6 +914,54 @@ test_that("query_openrouter sends log probability parameters", {
   )
 })
 
+test_that("query_openrouter sends Auto Router configuration and session IDs", {
+  captured_body <- NULL
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) {
+      captured_body <<- body
+      req
+    },
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      structure(
+        list(status = 200L, body = '{"choices":[{"message":{"content":"answer"}}]}'),
+        class = "httr2_response"
+      )
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_equal(
+    query_openrouter(
+      "hello",
+      model = "openrouter/auto",
+      auto_router_cost_tier = "high",
+      session_id = "workflow-42",
+      api_key = "key"
+    ),
+    "answer"
+  )
+  expect_equal(captured_body$model, "openrouter/auto")
+  expect_equal(
+    captured_body$plugins,
+    list(list(id = "auto-router", cost_tier = "high"))
+  )
+  expect_equal(captured_body$session_id, "workflow-42")
+
+  expect_error(
+    query_openrouter("hello", api_key = "key", auto_router_cost_tier = "cheap"),
+    "one of"
+  )
+  expect_error(
+    query_openrouter("hello", api_key = "key", session_id = ""),
+    "session_id"
+  )
+})
+
 test_that("OpenAI-compatible transport accepts provider parameters", {
   captured_body <- NULL
   testthat::local_mocked_bindings(
