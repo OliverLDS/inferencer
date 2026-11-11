@@ -261,8 +261,22 @@
 }
 
 .api_error_message <- function(json) {
-  if (!is.null(json$error) && !is.null(json$error$message) && nzchar(json$error$message)) {
-    return(json$error$message)
+  if (!is.list(json) || is.null(json$error)) {
+    return(NULL)
+  }
+
+  error <- json$error
+  if (is.character(error) && length(error) == 1 && !is.na(error) && nzchar(error)) {
+    return(error)
+  }
+
+  if (!is.list(error)) {
+    return(NULL)
+  }
+
+  message <- error$message
+  if (is.character(message) && length(message) == 1 && !is.na(message) && nzchar(message)) {
+    return(message)
   }
 
   NULL

@@ -434,6 +434,38 @@ test_that("OpenAI-compatible wrappers handle non-JSON HTTP errors", {
   )
 })
 
+test_that("OpenAI-compatible wrappers handle scalar error fields and JSON responses", {
+  response_index <- 0L
+  testthat::local_mocked_bindings(
+    request = function(url) structure(list(url = url), class = "request"),
+    req_headers = function(req, ...) req,
+    req_body_json = function(req, body, auto_unbox = TRUE) req,
+    req_error = function(req, is_error) req,
+    req_perform = function(req) {
+      response_index <<- response_index + 1L
+      body <- c(
+        '{"error":"rate limit exceeded"}',
+        '"temporarily unavailable"'
+      )[[response_index]]
+      structure(list(status = 429L, body = body), class = "httr2_response")
+    },
+    resp_body_string = function(resp) resp$body,
+    resp_status = function(resp) resp$status,
+    .package = "httr2"
+  )
+
+  expect_error(
+    query_openrouter("hello", api_key = "key"),
+    "OpenRouter API error: rate limit exceeded",
+    fixed = TRUE
+  )
+  expect_error(
+    query_openrouter("hello", api_key = "key"),
+    'OpenRouter API request failed: "temporarily unavailable"',
+    fixed = TRUE
+  )
+})
+
 test_that("OpenAI-compatible wrappers redact reflected API keys in errors", {
   testthat::local_mocked_bindings(
     request = function(url) structure(list(url = url), class = "request"),
